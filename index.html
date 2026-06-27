@@ -475,6 +475,16 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .form-row { grid-template-columns: 1fr; }
   .form-row-3 { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Fix topbar overflow on mobile */
+  .topbar { height: auto; min-height: 60px; flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
+  .topbar-right { flex-wrap: wrap; gap: 6px; }
+  .topbar-right select { font-size: 0.78rem; padding: 4px 8px; max-width: 110px !important; }
+  #term-badge { display: none; } /* hide on mobile to save space */
+  .topbar-brand h1 { font-size: 0.85rem; }
+  .main-content { margin-top: 0; padding-top: 70px; }
+  /* Bigger action buttons on mobile */
+  td .btn-xs { padding: 6px 10px; font-size: 0.82rem; }
+  #studentsTable td:last-child > div { flex-wrap: wrap; gap: 4px; }
 }
 @media print {
   .topbar, .sidebar, .page-header .btn, .no-print { display: none !important; }
@@ -486,7 +496,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 <!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<!-- QUAGGA -->
+<!-- Quagga Barcode Scanner -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 </head>
 <body>
@@ -711,8 +721,11 @@ textarea.form-control { resize: vertical; min-height: 80px; }
               </select>
             </div>
           </div>
-          <div id="barcodeVideo" style="height:260px;background:#111;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--text-muted)">
-            <div style="text-align:center"><i class="fas fa-camera" style="font-size:2rem;margin-bottom:8px;display:block"></i>الكاميرا متوقفة</div>
+          <div id="barcodeVideo" style="width:100%;border-radius:var(--radius-sm);overflow:hidden;background:#000;min-height:220px;">
+            <div id="qr-reader" style="width:100%"></div>
+            <div id="cam-placeholder" style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-muted)">
+              <div style="text-align:center"><i class="fas fa-camera" style="font-size:2rem;margin-bottom:8px;display:block"></i>الكاميرا متوقفة</div>
+            </div>
           </div>
           <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()"><i class="fas fa-play"></i> تشغيل الماسح</button>
@@ -1222,10 +1235,10 @@ let scannerRunning = false;
 // INIT
 // =============================================
 window.onload = () => {
-  // Default to August 2026 (start of 2026-2027)
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth() + 1;
-  // If we're in the valid range (Aug 2026+), use current month; else default to Aug 2026
+  // Valid months in our system: Aug(8)→Jul(7) — all 12 months shown
+  // Default: if before Aug 2026, start at 2026_08
   const validStart = (y > 2026) || (y === 2026 && m >= 8);
   currentMonth = validStart
     ? `${y}_${String(m).padStart(2,'0')}`
@@ -1239,62 +1252,100 @@ function buildMonthSelector() {
   // 12 months per academic year: Aug(8)→Jul(7), start 2026-2027, 10 cycles
   const START_YEAR = 2026, NUM_YEARS = 10;
   const MONTH_ORDER = [8,9,10,11,12,1,2,3,4,5,6,7];
+
+  // Build all months for all years
   const allMonths = [];
   for (let i = 0; i < NUM_YEARS; i++) {
     const aug_y = START_YEAR + i;
     const jan_y = aug_y + 1;
     const acadYear = `${aug_y}-${jan_y}`;
-    MONTH_ORDER.forEach(m => {
+    MONTH_ORDER.forEach(function(m) {
       const cy = m >= 8 ? aug_y : jan_y;
-      allMonths.push({ val:`${cy}_${String(m).padStart(2,'0')}`, lbl:`${MONTHS_AR[m-1]} ${cy}`, acadYear });
+      allMonths.push({
+        val: cy + '_' + String(m).padStart(2,'0'),
+        lbl: MONTHS_AR[m-1] + ' ' + cy,
+        acadYear: acadYear
+      });
     });
   }
-  const yearSel = document.getElementById('yearSelector');
+
+  // Determine current academic year inline (avoid dependency on getAcademicYear)
+  function _getAcad(monthKey) {
+    var parts = (monthKey || '2026_08').split('_');
+    var y = parseInt(parts[0]), m = parseInt(parts[1]);
+    return m >= 8 ? (y + '-' + (y+1)) : ((y-1) + '-' + y);
+  }
+
+  var curAcad = _getAcad(currentMonth);
+
+  // --- Year selector ---
+  var yearSel = document.getElementById('yearSelector');
   if (yearSel) {
-    const curAcad = getAcademicYear(currentMonth);
-    yearSel.innerHTML = [...new Set(allMonths.map(mo=>mo.acadYear))].map(yr=>
-      `<option value="${yr}"${yr===curAcad?' selected':''}>${yr}</option>`
-    ).join('');
+    var uniqueYears = [];
+    allMonths.forEach(function(mo) {
+      if (uniqueYears.indexOf(mo.acadYear) === -1) uniqueYears.push(mo.acadYear);
+    });
+    yearSel.innerHTML = uniqueYears.map(function(yr) {
+      return '<option value="' + yr + '"' + (yr === curAcad ? ' selected' : '') + '>' + yr + '</option>';
+    }).join('');
   }
-  const curAcad = getAcademicYear(currentMonth);
-  const filtered = allMonths.filter(mo=>mo.acadYear===curAcad);
-  const sel = document.getElementById('monthSelector');
-  sel.innerHTML = filtered.map(({val,lbl})=>
-    `<option value="${val}"${val===currentMonth?' selected':''}>${lbl}</option>`
-  ).join('');
-  if (filtered.length && !filtered.find(mo=>mo.val===currentMonth)) {
-    currentMonth = filtered[0].val; sel.value = currentMonth;
+
+  // --- Month selector (filtered by current academic year) ---
+  var filtered = allMonths.filter(function(mo) { return mo.acadYear === curAcad; });
+
+  // If currentMonth not in this year, reset to first of the year
+  if (filtered.length && !filtered.find(function(mo) { return mo.val === currentMonth; })) {
+    currentMonth = filtered[0].val;
   }
-  const hsel = document.getElementById('honorMonthFilter');
+
+  var sel = document.getElementById('monthSelector');
+  if (sel) {
+    sel.innerHTML = filtered.map(function(mo) {
+      return '<option value="' + mo.val + '"' + (mo.val === currentMonth ? ' selected' : '') + '>' + mo.lbl + '</option>';
+    }).join('');
+  }
+
+  // --- Honor roll month filter ---
+  var hsel = document.getElementById('honorMonthFilter');
   if (hsel) {
-    hsel.innerHTML = filtered.map(({val,lbl})=>
-      `<option value="${val}"${val===currentMonth?' selected':''}>${lbl}</option>`
-    ).join('');
+    hsel.innerHTML = filtered.map(function(mo) {
+      return '<option value="' + mo.val + '"' + (mo.val === currentMonth ? ' selected' : '') + '>' + mo.lbl + '</option>';
+    }).join('');
   }
 }
 
 function onYearChange() {
-  const yr = document.getElementById('yearSelector').value;
-  const START_YEAR = 2026, NUM_YEARS = 10;
-  const MONTH_ORDER = [8,9,10,11,12,1,2,3,4,5,6,7];
-  const allMonths = [];
-  for (let i = 0; i < NUM_YEARS; i++) {
-    const aug_y = START_YEAR + i, jan_y = aug_y + 1;
-    const acadYear = `${aug_y}-${jan_y}`;
-    MONTH_ORDER.forEach(m => {
-      const cy = m >= 8 ? aug_y : jan_y;
-      allMonths.push({ val:`${cy}_${String(m).padStart(2,'0')}`, lbl:`${MONTHS_AR[m-1]} ${cy}`, acadYear });
+  var yr = document.getElementById('yearSelector').value;
+  if (!yr) return;
+  var START_YEAR = 2026, NUM_YEARS = 10;
+  var MONTH_ORDER = [8,9,10,11,12,1,2,3,4,5,6,7];
+  var allMonths = [];
+  for (var i = 0; i < NUM_YEARS; i++) {
+    var aug_y = START_YEAR + i, jan_y = aug_y + 1;
+    var acadYear = aug_y + '-' + jan_y;
+    MONTH_ORDER.forEach(function(m) {
+      var cy = m >= 8 ? aug_y : jan_y;
+      allMonths.push({ val: cy+'_'+String(m).padStart(2,'0'), lbl: MONTHS_AR[m-1]+' '+cy, acadYear: acadYear });
     });
   }
-  const filtered = allMonths.filter(mo=>mo.acadYear===yr);
-  const sel = document.getElementById('monthSelector');
-  sel.innerHTML = filtered.map(({val,lbl})=>`<option value="${val}">${lbl}</option>`).join('');
-  if (filtered.length) { currentMonth=filtered[0].val; sel.value=currentMonth; updateTermBadge(); loadMonthData(); }
-  const hsel = document.getElementById('honorMonthFilter');
+  var filtered = allMonths.filter(function(mo) { return mo.acadYear === yr; });
+  var sel = document.getElementById('monthSelector');
+  if (sel) {
+    sel.innerHTML = filtered.map(function(mo) {
+      return '<option value="'+mo.val+'">'+mo.lbl+'</option>';
+    }).join('');
+  }
+  if (filtered.length) {
+    currentMonth = filtered[0].val;
+    if (sel) sel.value = currentMonth;
+    updateTermBadge();
+    loadMonthData();
+  }
+  var hsel = document.getElementById('honorMonthFilter');
   if (hsel) {
-    hsel.innerHTML = filtered.map(({val,lbl})=>
-      `<option value="${val}"${val===currentMonth?' selected':''}>${lbl}</option>`
-    ).join('');
+    hsel.innerHTML = filtered.map(function(mo) {
+      return '<option value="'+mo.val+'"'+(mo.val===currentMonth?' selected':'')+'>'+mo.lbl+'</option>';
+    }).join('');
   }
 }
 
@@ -1555,17 +1606,11 @@ function getTermFromMonth(monthKey) {
   return 'الترم الثاني';
 }
 function getAcademicYear(monthKey) {
-  const parts = (monthKey || currentMonth).split('_');
-  const y = parseInt(parts[0]), m = parseInt(parts[1]);
+  var parts = (monthKey || currentMonth || '2026_08').split('_');
+  var y = parseInt(parts[0]), m = parseInt(parts[1]);
   // Academic year starts Aug(8)
-  if (m >= 8) return `${y}-${y+1}`;
-  return `${y-1}-${y}`;
-}
-function getAcademicYear(monthKey) {
-  const parts = (monthKey || currentMonth).split('_');
-  const y = parseInt(parts[0]), m = parseInt(parts[1]);
-  if (m >= 9) return `${y}–${y+1}`;
-  return `${y-1}–${y}`;
+  if (m >= 8) return y + '-' + (y+1);
+  return (y-1) + '-' + y;
 }
 function updateTermBadge() {
   const badge = document.getElementById('term-badge');
@@ -2199,47 +2244,16 @@ function renderAttendanceTable() {
   }
   const rows = Object.values(students).filter(s => s.grade === grade);
   rows.sort((a,b) => (a.name||'').localeCompare(b.name||'','ar'));
-  // Count today's attendance
-  const today = new Date().toDateString();
-  let presentToday = 0;
-  tbody.innerHTML = rows.map(s => {
-    const md = monthData[s.id] || {};
-    const sess = md.sessions || {};
-    const exams = md.exams || {};
-    const attendCount = countAttendance(md);
-    let sessBtns = '';
-    for (let i = 1; i <= 8; i++) {
-      const v = sess[`s${i}`];
-      const cls = v === true ? 'present' : v === false ? 'absent' : '';
-      sessBtns += `<button class="sess-btn ${cls}" onclick="toggleSession('${s.id}',${i})" title="حصة ${i}">${i}</button>`;
-      if (v === true) presentToday++;
-    }
-    let examInputs = '';
-    for (let i = 1; i <= 8; i++) {
-      const v = exams[`e${i}`];
-      const maxAttr = i < 8 ? 'max="10"' : '';
-      examInputs += `<input type="number" class="exam-inp ${v!=null&&v!==''?'filled':''}" min="0" ${maxAttr} step="0.5"
-        value="${v!=null&&v!==''?v:''}" placeholder="ا${i}"
-        onchange="saveExamScore('${s.id}',${i},this.value)"
-        title="اختبار ${i}${i===8?' (بدون حد أقصى)':' (من 10)'}">`;
-    }
-    return `<tr>
-      <td><strong>${s.name}</strong></td>
-      <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px;font-size:0.8rem">${s.customCode||'-'}</code></td>
-      ${Array.from({length:8},(_,i) => {
-        const v = sess[`s${i+1}`];
-        return `<td><button class="sess-btn ${v===true?'present':v===false?'absent':''}" onclick="toggleSession('${s.id}',${i+1})">${i+1}</button></td>`;
-      }).join('')}
-      <td><div class="exam-inputs">${examInputs}</div></td>
-      <td><span class="badge ${attendCount>0?'badge-success':'badge-secondary'}">${attendCount}/8</span></td>
-    </tr>`;
-  }).join('');
+
+  // Build rows using buildAttRow
+  tbody.innerHTML = rows.length
+    ? rows.map(s => buildAttRow(s)).join('')
+    : `<tr><td colspan="12"><div class="empty-state"><i class="fas fa-users"></i><p>لا يوجد طلاب في هذا الصف</p></div></td></tr>`;
+
   // Summary
   const sumEl = document.getElementById('attSummary');
   sumEl.style.display = 'block';
   sumEl.textContent = `حضر ${rows.filter(s => countAttendance(monthData[s.id]||{}) > 0).length} من ${rows.length} طالب — صف ${grade}`;
-  // Fix tbody - rebuild without inner Array.from
-  tbody.innerHTML = rows.map(s => buildAttRow(s)).join('');
 }
 
 function buildAttRow(s) {
@@ -2340,44 +2354,74 @@ function registerAttendanceForStudent(studentId) {
 // =============================================
 // BARCODE SCANNER
 // =============================================
+// BARCODE SCANNER (Quagga)
+// =============================================
+let html5QrScanner = null;
+let lastScannedCode = '';
+let lastScannedTime = 0;
+
 function startScanner() {
   const grade = document.getElementById('barcodeGrade').value;
   if (!grade) { toast('اختر الصف أولاً','warning'); return; }
-  const videoEl = document.getElementById('barcodeVideo');
-  videoEl.innerHTML = '';
-  const video = document.createElement('video');
-  video.id = 'qrVideo'; video.setAttribute('playsinline','');
-  video.style.cssText = 'width:100%;border-radius:var(--radius-sm);display:block;';
-  videoEl.appendChild(video);
+
+  document.getElementById('cam-placeholder').style.display = 'none';
+
+  // Clear previous instance
+  try { Quagga.stop(); } catch(e){}
+
   Quagga.init({
     inputStream: {
-      name: 'Live', type: 'LiveStream',
-      target: video,
-      constraints: { facingMode: 'environment' }
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.getElementById('qr-reader'),
+      constraints: {
+        width: { min: 320 },
+        height: { min: 240 },
+        facingMode: 'environment'
+      }
     },
-    decoder: { readers: ['code_128_reader','ean_reader','code_39_reader','i2of5_reader'] }
-  }, err => {
-    if (err) { toast('لا يمكن الوصول للكاميرا','error'); return; }
+    locator: { patchSize: 'medium', halfSample: true },
+    numOfWorkers: 2,
+    frequency: 10,
+    decoder: {
+      readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader']
+    },
+    locate: true
+  }, function(err) {
+    if (err) {
+      toast('تعذّر الوصول للكاميرا','error');
+      document.getElementById('cam-placeholder').style.display = 'flex';
+      return;
+    }
     Quagga.start();
     scannerRunning = true;
     document.getElementById('startScanBtn').style.display = 'none';
     document.getElementById('stopScanBtn').style.display = 'inline-flex';
   });
-  Quagga.onDetected(result => {
+
+  Quagga.onDetected(function(result) {
     const code = result.codeResult.code;
+    if (!code) return;
+    // Debounce: ignore same code within 2 seconds
+    const now = Date.now();
+    if (code === lastScannedCode && now - lastScannedTime < 2000) return;
+    lastScannedCode = code;
+    lastScannedTime = now;
+    playBeep(true);
     processScannedCode(code, grade);
   });
 }
 
 function stopScanner() {
   if (scannerRunning) {
-    Quagga.stop();
+    try { Quagga.stop(); } catch(e){}
     scannerRunning = false;
   }
-  const videoEl = document.getElementById('barcodeVideo');
-  videoEl.innerHTML = `<div style="text-align:center"><i class="fas fa-camera" style="font-size:2rem;margin-bottom:8px;display:block"></i>الكاميرا متوقفة</div>`;
+  document.getElementById('cam-placeholder').style.display = 'flex';
+  document.getElementById('qr-reader').innerHTML = '';
   document.getElementById('startScanBtn').style.display = 'inline-flex';
   document.getElementById('stopScanBtn').style.display = 'none';
+  lastScannedCode = '';
 }
 
 function processScannedCode(code, grade) {
@@ -2946,15 +2990,12 @@ db.ref('.info/connected').on('value', snap => {
 // INIT GRADE SELECTS ON DOM READY
 // =============================================
 document.addEventListener('DOMContentLoaded', () => {
-  buildMonthSelector();
-  populateGradeSelects();
+  // window.onload handles init — DOMContentLoaded is just a safety net
+  if (!document.getElementById('monthSelector').options.length) {
+    buildMonthSelector();
+    populateGradeSelects();
+  }
 });
-
-// Re-populate after dynamic load
-setTimeout(() => {
-  populateGradeSelects();
-  buildMonthSelector();
-}, 100);
 </script>
 
 <!-- PRINT STYLES FOR SCHEDULES -->
