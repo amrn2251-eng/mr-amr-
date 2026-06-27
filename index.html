@@ -475,16 +475,29 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .form-row { grid-template-columns: 1fr; }
   .form-row-3 { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  /* Fix topbar overflow on mobile */
-  .topbar { height: auto; min-height: 60px; flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-  .topbar-right { flex-wrap: wrap; gap: 6px; }
-  .topbar-right select { font-size: 0.78rem; padding: 4px 8px; max-width: 110px !important; }
-  #term-badge { display: none; } /* hide on mobile to save space */
-  .topbar-brand h1 { font-size: 0.85rem; }
-  .main-content { margin-top: 0; padding-top: 70px; }
-  /* Bigger action buttons on mobile */
+
+  /* ── Topbar compact on mobile ── */
+  .topbar {
+    height: 54px !important;
+    padding: 0 10px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  .topbar-brand img { display: none; }
+  .topbar-brand p   { font-size: 0.7rem; color: var(--text-secondary); display: block; }
+  .topbar-brand h1  { font-size: 0.82rem; }
+  #term-badge       { display: none !important; }
+  #yearSelector     { display: none; }           /* hide year selector — use month only */
+  #monthSelector    { max-width: 100px; font-size: 0.75rem; padding: 4px 6px; }
+  .topbar-right     { gap: 4px; }
+  .topbar-user      { display: none; }           /* hide username text */
+  .btn-icon         { padding: 5px; font-size: 0.88rem; }
+
+  /* Main content starts right below fixed topbar */
+  .main-content { margin-top: 54px !important; padding: 12px; }
+
+  /* Bigger tap targets for action buttons */
   td .btn-xs { padding: 6px 10px; font-size: 0.82rem; }
-  #studentsTable td:last-child > div { flex-wrap: wrap; gap: 4px; }
 }
 @media print {
   .topbar, .sidebar, .page-header .btn, .no-print { display: none !important; }
@@ -496,8 +509,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 <!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<!-- Quagga Barcode Scanner -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<!-- html5-qrcode: يقرأ QR Code وباركود -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
@@ -709,27 +722,34 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     <!-- BARCODE TAB -->
     <div class="tab-page" id="tab-barcode">
       <div class="page-header">
-        <div class="page-title"><i class="fas fa-barcode"></i> ماسح الباركود</div>
+        <div class="page-title"><i class="fas fa-barcode"></i> ماسح QR / الباركود</div>
       </div>
       <div style="max-width:600px;margin:0 auto">
         <div class="card">
-          <div class="filter-bar" style="margin-bottom:12px">
-            <div class="form-group" style="margin-bottom:0">
-              <label>الصف</label>
-              <select class="form-control" id="barcodeGrade">
-                <option value="">-- اختر الصف --</option>
+          <!-- Camera selector -->
+          <div class="filter-bar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+              <label><i class="fas fa-camera"></i> اختر الكاميرا</label>
+              <select class="form-control" id="cameraSelect" style="font-size:0.85rem;">
+                <option value="">جاري تحميل الكاميرات...</option>
               </select>
             </div>
-          </div>
-          <div id="barcodeVideo" style="width:100%;border-radius:var(--radius-sm);overflow:hidden;background:#000;min-height:220px;">
-            <div id="qr-reader" style="width:100%"></div>
-            <div id="cam-placeholder" style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-muted)">
-              <div style="text-align:center"><i class="fas fa-camera" style="font-size:2rem;margin-bottom:8px;display:block"></i>الكاميرا متوقفة</div>
+            <div style="display:flex;align-items:flex-end;gap:6px;">
+              <button class="btn btn-secondary btn-sm" onclick="loadCameras()"><i class="fas fa-rotate"></i> تحديث</button>
             </div>
           </div>
-          <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-            <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()"><i class="fas fa-play"></i> تشغيل الماسح</button>
-            <button class="btn btn-secondary" id="stopScanBtn" onclick="stopScanner()" style="display:none"><i class="fas fa-stop"></i> إيقاف</button>
+          <!-- Camera view -->
+          <div id="barcodeVideo" style="width:100%;border-radius:var(--radius-sm);overflow:hidden;background:#111;min-height:280px;position:relative;">
+            <div id="qr-reader" style="width:100%;"></div>
+            <div id="cam-placeholder" style="display:flex;align-items:center;justify-content:center;height:280px;color:var(--text-muted);flex-direction:column;gap:10px;">
+              <i class="fas fa-camera" style="font-size:2.5rem;opacity:0.4;"></i>
+              <span style="font-size:0.9rem;">اضغط "تشغيل" لبدء المسح</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()"><i class="fas fa-play"></i> تشغيل</button>
+            <button class="btn btn-danger" id="stopScanBtn" onclick="stopScanner()" style="display:none"><i class="fas fa-stop"></i> إيقاف</button>
+            <span style="font-size:0.8rem;color:var(--text-muted);">يقرأ: QR Code + باركود</span>
           </div>
         </div>
         <div class="scan-result" id="scanResult">
@@ -842,27 +862,16 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           <p style="color:var(--text-muted);margin-bottom:12px;font-size:0.88rem">هذه الإجراءات لا يمكن التراجع عنها</p>
           <button class="btn btn-danger" onclick="confirmClearServer()"><i class="fas fa-trash-alt"></i> مسح بيانات السيرفر</button>
         </div>
-        <!-- Assistant Account Management -->
+        <!-- Assistant Accounts Management -->
         <div class="card" style="margin-top:16px;border-color:rgba(124,92,252,0.4)">
           <div class="card-header">
-            <span class="card-title"><i class="fas fa-user-shield" style="color:var(--accent2)"></i> حساب المساعد</span>
+            <span class="card-title"><i class="fas fa-user-shield" style="color:var(--accent2)"></i> حسابات المساعدين</span>
+            <button class="btn btn-xs btn-secondary" onclick="addAssistantRow()"><i class="fas fa-plus"></i> إضافة مساعد</button>
           </div>
-          <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:14px">يستطيع المساعد إضافة الطلاب وتسجيل الحضور والدرجات فقط — بدون وصول للخزنة أو الأرشيف.</p>
-          <div class="form-row">
-            <div class="form-group">
-              <label>رقم هاتف المساعد</label>
-              <input type="tel" id="assistantPhone" class="form-control" placeholder="01XXXXXXXXX">
-            </div>
-            <div class="form-group">
-              <label>كلمة مرور المساعد</label>
-              <div style="position:relative">
-                <input type="password" id="assistantPass" class="form-control" placeholder="كلمة مرور" style="padding-left:40px">
-                <button type="button" onclick="togglePassVis('assistantPass','eyeAst')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-secondary);cursor:pointer"><i class="fas fa-eye" id="eyeAst"></i></button>
-              </div>
-            </div>
-          </div>
-          <button class="btn btn-secondary" onclick="saveAssistantAccount()"><i class="fas fa-save"></i> حفظ بيانات المساعد</button>
-          <div id="assistantStatus" style="margin-top:10px;font-size:0.85rem;color:var(--text-muted)"></div>
+          <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:12px">يستطيع المساعد إضافة الطلاب وتسجيل الحضور والدرجات — بدون وصول للخزنة أو الأرشيف.</p>
+          <div id="assistants-list"></div>
+          <button class="btn btn-secondary" style="margin-top:10px" onclick="saveAllAssistants()"><i class="fas fa-save"></i> حفظ جميع المساعدين</button>
+          <div id="assistantStatus" style="margin-top:8px;font-size:0.82rem;color:var(--text-muted)"></div>
         </div>
       </div>
     </div>
@@ -921,8 +930,12 @@ textarea.form-control { resize: vertical; min-height: 80px; }
         <input type="text" id="sName" class="form-control" placeholder="الاسم كاملاً">
       </div>
       <div class="form-group">
-        <label>رقم الواتساب <span style="color:var(--danger)">*</span></label>
+        <label>رقم الواتساب</label>
         <input type="tel" id="sPhone" class="form-control" placeholder="01XXXXXXXXX">
+        <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="sNoWA" onchange="toggleNoWA()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
+          <label for="sNoWA" style="margin:0;font-size:0.82rem;color:var(--text-muted);cursor:pointer;">ليس لديه واتساب</label>
+        </div>
       </div>
     </div>
     <div class="form-row">
@@ -942,6 +955,19 @@ textarea.form-control { resize: vertical; min-height: 80px; }
       <div class="form-group">
         <label>الكود المخصص <span style="color:var(--danger)">*</span></label>
         <input type="text" id="sCode" class="form-control" placeholder="كود فريد للطالب">
+      </div>
+      <div class="form-group">
+        <label>تاريخ الانضمام</label>
+        <input type="date" id="sJoinDate" class="form-control">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>حالة الطالب</label>
+        <select id="sStatus" class="form-control">
+          <option value="active">نشط</option>
+          <option value="left">غادر الأوربيتالي</option>
+        </select>
       </div>
       <div class="form-group">
         <label>ملاحظات</label>
@@ -1413,24 +1439,29 @@ function doTeacherLogin() {
       loadAllData();
       loadArchivedMonths();
       showTab('students');
-    } else if (settings.assistantPhone && phone === settings.assistantPhone && settings.assistantPass && pass === settings.assistantPass) {
-      // ASSISTANT LOGIN — limited access
-      currentUser = 'assistant';
-      err.style.display = 'none';
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      document.getElementById('nav-safe').style.display = 'none';
-      document.getElementById('nav-archive').style.display = 'none';
-      document.getElementById('topbarUser').textContent = 'المساعد';
-      // hide key-change button for assistant
-      const keyBtn = document.querySelector('button[onclick="openChangeAdminPass()"]');
-      if (keyBtn) keyBtn.style.display = 'none';
-      updateTermBadge();
-      loadAllData();
-      showTab('students');
     } else {
-      err.textContent = 'رقم الهاتف أو كلمة المرور غير صحيحة';
-      err.style.display = 'block';
+      // Check multi-assistant accounts
+      const asts = settings.assistants || [];
+      // Also support legacy single assistant
+      if (settings.assistantPhone) asts.push({ name:'المساعد', phone: settings.assistantPhone, pass: settings.assistantPass||'' });
+      const matched = asts.find(a => a.phone === phone && a.pass === pass);
+      if (matched) {
+        currentUser = 'assistant';
+        err.style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('nav-safe').style.display = 'none';
+        document.getElementById('nav-archive').style.display = 'none';
+        document.getElementById('topbarUser').textContent = matched.name ? 'المساعد: ' + matched.name : 'المساعد';
+        const keyBtn = document.querySelector('button[onclick="openChangeAdminPass()"]');
+        if (keyBtn) keyBtn.style.display = 'none';
+        updateTermBadge();
+        loadAllData();
+        showTab('students');
+      } else {
+        err.textContent = 'رقم الهاتف أو كلمة المرور غير صحيحة';
+        err.style.display = 'block';
+      }
     }
   }).catch(() => {
     // offline fallback
@@ -1568,29 +1599,67 @@ function doChangeSafePin() {
 }
 
 // =============================================
-// ASSISTANT ACCOUNT
+// ASSISTANT ACCOUNTS (multiple)
 // =============================================
-function saveAssistantAccount() {
-  const phone = document.getElementById('assistantPhone').value.trim();
-  const pass  = document.getElementById('assistantPass').value.trim();
-  const status = document.getElementById('assistantStatus');
-  if (!phone || !pass) { status.textContent = '⚠️ أدخل الرقم وكلمة المرور'; status.style.color = 'var(--warning)'; return; }
-  db.ref('settings').update({ assistantPhone: phone, assistantPass: pass })
-    .then(() => { status.textContent = '✅ تم حفظ بيانات المساعد بنجاح'; status.style.color = 'var(--success)'; })
-    .catch(() => { status.textContent = '❌ خطأ في الحفظ'; status.style.color = 'var(--danger)'; });
+let assistantsList = []; // [{name, phone, pass}]
+
+function addAssistantRow(data) {
+  data = data || { name:'', phone:'', pass:'' };
+  const list = document.getElementById('assistants-list');
+  if (!list) return;
+  const idx = list.children.length;
+  const div = document.createElement('div');
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end;';
+  div.innerHTML = `
+    <div><label style="font-size:0.8rem;color:var(--text-secondary)">الاسم</label>
+      <input type="text" class="form-control ast-name" placeholder="اسم المساعد" value="${data.name||''}"></div>
+    <div><label style="font-size:0.8rem;color:var(--text-secondary)">رقم الهاتف</label>
+      <input type="tel" class="form-control ast-phone" placeholder="01XXXXXXXXX" value="${data.phone||''}"></div>
+    <div><label style="font-size:0.8rem;color:var(--text-secondary)">كلمة المرور</label>
+      <input type="text" class="form-control ast-pass" placeholder="كلمة مرور" value="${data.pass||''}"></div>
+    <button class="btn btn-danger btn-sm" style="margin-bottom:0" onclick="this.parentElement.remove()"><i class="fas fa-trash"></i></button>`;
+  list.appendChild(div);
+}
+
+function saveAllAssistants() {
+  const rows = document.querySelectorAll('#assistants-list > div');
+  const arr = [];
+  rows.forEach(row => {
+    const name  = row.querySelector('.ast-name').value.trim();
+    const phone = row.querySelector('.ast-phone').value.trim();
+    const pass  = row.querySelector('.ast-pass').value.trim();
+    if (phone && pass) arr.push({ name, phone, pass });
+  });
+  db.ref('settings/assistants').set(arr).then(() => {
+    assistantsList = arr;
+    const status = document.getElementById('assistantStatus');
+    status.textContent = `✅ تم حفظ ${arr.length} مساعد`;
+    status.style.color = 'var(--success)';
+  }).catch(() => {
+    const status = document.getElementById('assistantStatus');
+    status.textContent = '❌ خطأ في الحفظ';
+    status.style.color = 'var(--danger)';
+  });
 }
 
 function loadAssistantAccountUI() {
   db.ref('settings').once('value', snap => {
     const s = snap.val() || {};
-    const phEl = document.getElementById('assistantPhone');
-    const paEl = document.getElementById('assistantPass');
-    if (phEl && s.assistantPhone) phEl.value = s.assistantPhone;
-    if (paEl && s.assistantPass) paEl.value = s.assistantPass;
-    const status = document.getElementById('assistantStatus');
-    if (status && s.assistantPhone) {
-      status.textContent = `حساب المساعد مفعّل: ${s.assistantPhone}`;
-      status.style.color = 'var(--success)';
+    // Support both old single assistant and new multi-assistant
+    const list = document.getElementById('assistants-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (s.assistants && Array.isArray(s.assistants)) {
+      assistantsList = s.assistants;
+      s.assistants.forEach(a => addAssistantRow(a));
+    } else if (s.assistantPhone) {
+      // migrate old single assistant
+      assistantsList = [{ name:'المساعد', phone: s.assistantPhone, pass: s.assistantPass||'' }];
+      addAssistantRow(assistantsList[0]);
+    }
+    if (assistantsList.length) {
+      const status = document.getElementById('assistantStatus');
+      if (status) { status.textContent = `${assistantsList.length} مساعد مسجّل`; status.style.color='var(--success)'; }
     }
   });
 }
@@ -1849,6 +1918,7 @@ function showTab(tab) {
   if (tab === 'parent') renderParentPortal();
   if (tab === 'archive') { loadArchivedMonths(); }
   if (tab !== 'barcode' && scannerRunning) stopScanner();
+  if (tab === 'barcode') { setTimeout(loadCameras, 300); }
 }
 
 function toggleSidebar() {
@@ -1931,10 +2001,14 @@ function openAddStudent() {
   document.getElementById('studentModalTitle').textContent = 'إضافة طالب جديد';
   document.getElementById('sName').value = '';
   document.getElementById('sPhone').value = '';
+  document.getElementById('sPhone').disabled = false;
+  document.getElementById('sNoWA').checked = false;
   document.getElementById('sGrade').value = GRADES[0];
   document.getElementById('sType').value = 'private';
   document.getElementById('sCode').value = '';
   document.getElementById('sNotes').value = '';
+  document.getElementById('sStatus').value = 'active';
+  document.getElementById('sJoinDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('sEditId').value = '';
   openModal('studentModal');
 }
@@ -1944,32 +2018,52 @@ function openEditStudent(id) {
   if (!s) return;
   document.getElementById('studentModalTitle').textContent = 'تعديل بيانات الطالب';
   document.getElementById('sName').value = s.name || '';
-  document.getElementById('sPhone').value = s.phone || '';
+  const noWA = !s.phone || s.phone === 'none';
+  document.getElementById('sNoWA').checked = noWA;
+  document.getElementById('sPhone').value = noWA ? '' : (s.phone || '');
+  document.getElementById('sPhone').disabled = noWA;
   document.getElementById('sGrade').value = s.grade || GRADES[0];
   document.getElementById('sType').value = s.type || 'private';
   document.getElementById('sCode').value = s.customCode || '';
   document.getElementById('sNotes').value = s.notes || '';
+  document.getElementById('sStatus').value = s.status || 'active';
+  document.getElementById('sJoinDate').value = s.joinDate || new Date().toISOString().split('T')[0];
   document.getElementById('sEditId').value = id;
   openModal('studentModal');
 }
 
+function toggleNoWA() {
+  const noWA = document.getElementById('sNoWA').checked;
+  const phoneInp = document.getElementById('sPhone');
+  phoneInp.disabled = noWA;
+  if (noWA) phoneInp.value = '';
+}
+
 function saveStudent() {
-  const name = document.getElementById('sName').value.trim();
-  const phone = document.getElementById('sPhone').value.trim();
-  const grade = document.getElementById('sGrade').value;
-  const type = document.getElementById('sType').value;
-  const code = document.getElementById('sCode').value.trim();
-  const notes = document.getElementById('sNotes').value.trim();
-  const editId = document.getElementById('sEditId').value;
-  if (!name) { toast('أدخل اسم الطالب','error'); return; }
-  if (!phone) { toast('أدخل رقم الواتساب','error'); return; }
-  if (!code) { toast('أدخل الكود المخصص','error'); return; }
-  // Check code uniqueness
+  const name    = document.getElementById('sName').value.trim();
+  const noWA    = document.getElementById('sNoWA').checked;
+  const phone   = noWA ? 'none' : document.getElementById('sPhone').value.trim();
+  const grade   = document.getElementById('sGrade').value;
+  const type    = document.getElementById('sType').value;
+  const code    = document.getElementById('sCode').value.trim();
+  const notes   = document.getElementById('sNotes').value.trim();
+  const status  = document.getElementById('sStatus').value;
+  const joinDate= document.getElementById('sJoinDate').value;
+  const editId  = document.getElementById('sEditId').value;
+
+  if (!name)  { toast('أدخل اسم الطالب','error'); return; }
+  if (!noWA && !phone) { toast('أدخل رقم الواتساب أو اختر "ليس لديه واتساب"','error'); return; }
+  if (!code)  { toast('أدخل الكود المخصص','error'); return; }
+
   const existingCode = Object.values(students).find(s => s.customCode === code && s.id !== editId);
   if (existingCode) { toast('هذا الكود مستخدم لطالب آخر','error'); return; }
+
   const id = editId || db.ref('students').push().key;
-  const data = { id, name, phone, grade, type, customCode: code, notes,
-    createdAt: editId ? (students[editId]?.createdAt || Date.now()) : Date.now() };
+  const data = {
+    id, name, phone, grade, type, customCode: code, notes, status,
+    joinDate: joinDate || new Date().toISOString().split('T')[0],
+    createdAt: editId ? (students[editId]?.createdAt || Date.now()) : Date.now()
+  };
   db.ref(`students/${id}`).set(data).then(() => {
     toast(editId ? 'تم تحديث البيانات' : 'تم إضافة الطالب بنجاح','success');
     closeModal('studentModal');
@@ -2040,13 +2134,18 @@ function renderStudentsTable() {
   const tbody = document.getElementById('studentsBody');
   if (!tbody) return;
   let rows = Object.values(students);
+  // Always show all students in the table (including left), but mark them
   if (grade) rows = rows.filter(s => s.grade === grade);
   if (type) rows = rows.filter(s => s.type === type);
   if (search) rows = rows.filter(s =>
     (s.name||'').toLowerCase().includes(search) ||
     (s.customCode||'').toLowerCase().includes(search)
   );
-  rows.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ar'));
+  rows.sort((a,b) => {
+    // Active students first
+    if ((a.status||'active') !== (b.status||'active')) return (a.status||'active') === 'active' ? -1 : 1;
+    return (a.name||'').localeCompare(b.name||'', 'ar');
+  });
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><i class="fas fa-users"></i><p>لا يوجد طلاب</p></div></td></tr>`;
     return;
@@ -2058,29 +2157,33 @@ function renderStudentsTable() {
     const attendance = countAttendance(md);
     const totalScore = calcTotalScore(md);
     const rank = ranks[s.grade]?.findIndex(r => r.id === s.id);
+    const isLeft = (s.status||'active') === 'left';
     const rankTxt = rank !== undefined && rank >= 0 && rank < 3 ? ['🥇','🥈','🥉'][rank] : '-';
     const payCell = s.type === 'private'
       ? (md.paid
         ? `<span class="badge badge-success" style="cursor:pointer" onclick="confirmUnpay('${s.id}')" title="اضغط لإلغاء الدفع"><i class="fas fa-check"></i> مدفوع ${md.payDate?'('+md.payDate+')':''} <i class="fas fa-times" style="font-size:0.7rem;opacity:0.7"></i></span>`
         : `<button class="btn btn-sm btn-warning" onclick="openPayModal('${s.id}')"><i class="fas fa-money-bill-wave"></i> تسجيل دفع</button>`)
       : `<span class="badge badge-secondary">سنتر</span>`;
-    return `<tr>
+    return `<tr style="${isLeft?'opacity:0.5;':''}">
       <td>${i+1}</td>
-      <td><strong>${s.name}</strong></td>
+      <td>
+        <strong>${s.name}</strong>
+        ${isLeft ? '<span class="badge badge-danger" style="font-size:0.7rem;margin-right:4px">غادر</span>' : ''}
+      </td>
       <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
       <td><code style="background:var(--bg-card2);padding:2px 8px;border-radius:4px">${s.customCode||'-'}</code></td>
       <td><span class="badge ${s.type==='private'?'badge-info':'badge-secondary'}">${s.type==='private'?'برايفيت':'سنتر'}</span></td>
-      <td>${payCell}</td>
+      <td>${isLeft ? '<span class="badge badge-secondary">—</span>' : payCell}</td>
       <td><span class="${attendance>0?'badge badge-success':'badge badge-secondary'}">${attendance}/8</span></td>
       <td>${totalScore}/80</td>
-      <td>${rankTxt}</td>
+      <td>${isLeft ? '<span style="color:var(--text-muted);font-size:0.8rem">—</span>' : rankTxt}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-xs btn-secondary" onclick="openStudentDetail('${s.id}')" title="تفاصيل"><i class="fas fa-eye"></i></button>
           <button class="btn btn-xs btn-secondary" onclick="openEditStudent('${s.id}')" title="تعديل"><i class="fas fa-edit"></i></button>
-          <button class="btn btn-xs" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')" title="ترحيب"><i class="fab fa-whatsapp"></i></button>
+          ${s.phone!=='none' ? `<button class="btn btn-xs" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')" title="ترحيب"><i class="fab fa-whatsapp"></i></button>
           <button class="btn btn-xs btn-outline-accent" onclick="sendDailyReport('${s.id}')" title="يومي"><i class="fas fa-sun"></i></button>
-          <button class="btn btn-xs" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')" title="شهري"><i class="fas fa-calendar"></i></button>
+          <button class="btn btn-xs" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')" title="شهري"><i class="fas fa-calendar"></i></button>` : ''}
           <button class="btn btn-xs btn-danger" onclick="openDeleteStudent('${s.id}')" title="حذف"><i class="fas fa-trash"></i></button>
         </div>
       </td>
@@ -2109,17 +2212,20 @@ function openStudentDetail(id) {
     const maxLabel = i < 8 ? '/10' : '';
     examHtml += `<span class="badge badge-accent" style="margin:2px">${v!=null&&v!==''?v:'—'}${maxLabel} ا${i}</span>`;
   }
-  document.getElementById('detailTitle').textContent = s.name;
+  document.getElementById('detailTitle').textContent = s.name + (( s.status==='left') ? ' 🚪' : '');
   document.getElementById('studentDetailContent').innerHTML = `
     <div class="form-row">
-      <div class="info-row"><span class="info-label">الاسم</span><span class="info-val">${s.name}</span></div>
-      <div class="info-row"><span class="info-label">الهاتف</span><span class="info-val">${s.phone}</span></div>
+      <div class="info-row"><span class="info-label">الاسم</span><span class="info-val">${s.name} ${s.status==='left'?'<span class="badge badge-danger">غادر</span>':''}</span></div>
+      <div class="info-row"><span class="info-label">الواتساب</span><span class="info-val">${s.phone==='none'?'<span style="color:var(--text-muted)">ليس لديه</span>':s.phone}</span></div>
     </div>
     <div class="form-row" style="margin-top:8px">
       <div class="info-row"><span class="info-label">الصف</span><span class="info-val">${s.grade}</span></div>
       <div class="info-row"><span class="info-label">النوع</span><span class="info-val">${s.type==='private'?'برايفيت':'سنتر'}</span></div>
     </div>
-    <div class="info-row" style="margin-top:8px"><span class="info-label">الكود</span><span class="info-val"><code style="background:var(--bg-card2);padding:2px 8px;border-radius:4px">${s.customCode||'-'}</code></span></div>
+    <div class="form-row" style="margin-top:8px">
+      <div class="info-row"><span class="info-label">الكود</span><span class="info-val"><code style="background:var(--bg-card2);padding:2px 8px;border-radius:4px">${s.customCode||'-'}</code></span></div>
+      <div class="info-row"><span class="info-label">تاريخ الانضمام</span><span class="info-val">${s.joinDate||'-'}</span></div>
+    </div>
     <hr style="border-color:var(--border);margin:14px 0">
     <div style="font-weight:700;margin-bottom:8px;color:var(--accent)">📅 ${formatMonthLabel(currentMonth)}</div>
     <div class="form-row">
@@ -2133,7 +2239,12 @@ function openStudentDetail(id) {
     <div style="margin-top:10px"><div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:6px">الحضور:</div>${sessHtml}</div>
     <div style="margin-top:10px"><div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:6px">الدرجات:</div>${examHtml}</div>
     <div class="info-row" style="margin-top:10px"><span class="info-label">المركز</span><span class="info-val">${rankTxt}</span></div>
-    ${s.notes?`<div class="info-row"><span class="info-label">ملاحظات</span><span class="info-val">${s.notes}</span></div>`:''}`;
+    ${s.notes?`<div class="info-row"><span class="info-label">ملاحظات</span><span class="info-val">${s.notes}</span></div>`:''}
+    ${s.phone!=='none'?`<hr style="border-color:var(--border);margin:12px 0"><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+      <button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')"><i class="fab fa-whatsapp"></i> ترحيب</button>
+      <button class="btn btn-sm btn-outline-accent" onclick="sendDailyReport('${s.id}')"><i class="fas fa-sun"></i> يومي</button>
+      <button class="btn btn-sm" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')"><i class="fas fa-calendar"></i> شهري</button>
+    </div>`:''}`;
   openModal('studentDetailModal');
 }
 
@@ -2157,7 +2268,8 @@ function computeRanks(monthKey) {
   const md = monthKey === currentMonth ? monthData : {};
   const result = {};
   GRADES.forEach(grade => {
-    const gradeStudents = Object.values(students).filter(s => s.grade === grade);
+    // Exclude students who left
+    const gradeStudents = Object.values(students).filter(s => s.grade === grade && (s.status||'active') === 'active');
     const scored = gradeStudents.map(s => ({
       id: s.id, name: s.name,
       score: calcTotalScore(md[s.id] || {})
@@ -2352,86 +2464,133 @@ function registerAttendanceForStudent(studentId) {
 
 <script>
 // =============================================
-// BARCODE SCANNER
-// =============================================
-// BARCODE SCANNER (Quagga)
+// BARCODE / QR SCANNER (html5-qrcode)
 // =============================================
 let html5QrScanner = null;
 let lastScannedCode = '';
 let lastScannedTime = 0;
 
-function startScanner() {
-  const grade = document.getElementById('barcodeGrade').value;
-  if (!grade) { toast('اختر الصف أولاً','warning'); return; }
-
-  document.getElementById('cam-placeholder').style.display = 'none';
-
-  // Clear previous instance
-  try { Quagga.stop(); } catch(e){}
-
-  Quagga.init({
-    inputStream: {
-      name: 'Live',
-      type: 'LiveStream',
-      target: document.getElementById('qr-reader'),
-      constraints: {
-        width: { min: 320 },
-        height: { min: 240 },
-        facingMode: 'environment'
-      }
-    },
-    locator: { patchSize: 'medium', halfSample: true },
-    numOfWorkers: 2,
-    frequency: 10,
-    decoder: {
-      readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader']
-    },
-    locate: true
-  }, function(err) {
-    if (err) {
-      toast('تعذّر الوصول للكاميرا','error');
-      document.getElementById('cam-placeholder').style.display = 'flex';
+// Load available cameras into dropdown
+function loadCameras() {
+  const sel = document.getElementById('cameraSelect');
+  sel.innerHTML = '<option value="">جاري التحميل...</option>';
+  Html5Qrcode.getCameras().then(cameras => {
+    sel.innerHTML = '';
+    if (!cameras || !cameras.length) {
+      sel.innerHTML = '<option value="">لا توجد كاميرات</option>';
       return;
     }
-    Quagga.start();
-    scannerRunning = true;
-    document.getElementById('startScanBtn').style.display = 'none';
-    document.getElementById('stopScanBtn').style.display = 'inline-flex';
-  });
-
-  Quagga.onDetected(function(result) {
-    const code = result.codeResult.code;
-    if (!code) return;
-    // Debounce: ignore same code within 2 seconds
-    const now = Date.now();
-    if (code === lastScannedCode && now - lastScannedTime < 2000) return;
-    lastScannedCode = code;
-    lastScannedTime = now;
-    playBeep(true);
-    processScannedCode(code, grade);
+    cameras.forEach((cam, i) => {
+      const opt = document.createElement('option');
+      opt.value = cam.id;
+      opt.textContent = cam.label || ('كاميرا ' + (i+1));
+      // Auto-select back camera
+      if (cam.label && cam.label.toLowerCase().includes('back')) opt.selected = true;
+      else if (cam.label && cam.label.toLowerCase().includes('rear')) opt.selected = true;
+      else if (i === cameras.length - 1 && !sel.value) opt.selected = true; // last camera = usually back
+      sel.appendChild(opt);
+    });
+  }).catch(() => {
+    sel.innerHTML = '<option value="">تعذّر تحميل الكاميرات</option>';
   });
 }
 
+function startScanner() {
+  document.getElementById('cam-placeholder').style.display = 'none';
+
+  // Must fully stop & release camera before starting again
+  const doStart = () => {
+    const cameraId = document.getElementById('cameraSelect').value;
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ]
+    };
+
+    // Always create fresh instance
+    try { document.getElementById('qr-reader').innerHTML = ''; } catch(e){}
+    html5QrScanner = new Html5Qrcode('qr-reader');
+
+    const camConstraint = cameraId
+      ? { deviceId: { exact: cameraId } }
+      : { facingMode: 'environment' };
+
+    html5QrScanner.start(
+      camConstraint,
+      config,
+      function(decodedText) {
+        const now = Date.now();
+        if (decodedText === lastScannedCode && now - lastScannedTime < 2000) return;
+        lastScannedCode = decodedText;
+        lastScannedTime = now;
+        playBeep(true);
+        processScannedCode(decodedText);
+      },
+      function() {}
+    ).then(() => {
+      scannerRunning = true;
+      document.getElementById('startScanBtn').style.display = 'none';
+      document.getElementById('stopScanBtn').style.display = 'inline-flex';
+    }).catch(err => {
+      html5QrScanner = null;
+      document.getElementById('cam-placeholder').style.display = 'flex';
+      // Show friendly error
+      const msg = String(err);
+      if (msg.includes('NotReadableError') || msg.includes('Could not start')) {
+        toast('الكاميرا مشغولة — اغلق أي تطبيق آخر يستخدمها ثم أعد المحاولة', 'error');
+      } else if (msg.includes('NotAllowedError')) {
+        toast('لم يتم السماح بالوصول للكاميرا — افتح الإعدادات وامنح الإذن', 'error');
+      } else {
+        toast('تعذّر تشغيل الكاميرا: ' + msg, 'error');
+      }
+    });
+  };
+
+  // If scanner already running, stop first then wait for release
+  if (html5QrScanner) {
+    html5QrScanner.stop().then(() => {
+      html5QrScanner.clear();
+      html5QrScanner = null;
+      setTimeout(doStart, 600); // wait 600ms for OS to release camera
+    }).catch(() => {
+      html5QrScanner = null;
+      setTimeout(doStart, 600);
+    });
+  } else {
+    doStart();
+  }
+}
+
 function stopScanner() {
-  if (scannerRunning) {
-    try { Quagga.stop(); } catch(e){}
+  if (html5QrScanner) {
+    html5QrScanner.stop().then(() => {
+      try { html5QrScanner.clear(); } catch(e){}
+      html5QrScanner = null;
+    }).catch(() => { html5QrScanner = null; });
     scannerRunning = false;
   }
   document.getElementById('cam-placeholder').style.display = 'flex';
-  document.getElementById('qr-reader').innerHTML = '';
   document.getElementById('startScanBtn').style.display = 'inline-flex';
   document.getElementById('stopScanBtn').style.display = 'none';
   lastScannedCode = '';
 }
 
-function processScannedCode(code, grade) {
-  const s = Object.values(students).find(s => s.customCode === code && s.grade === grade);
+function processScannedCode(code) {
+  const s = Object.values(students).find(s => s.customCode === code);
   const resultEl = document.getElementById('scanResult');
   const histEl = document.getElementById('scanHistory');
   const histList = document.getElementById('scanHistoryList');
   if (!s) {
-    const msg = `كود غير معروف: ${code}`;
-    resultEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> ${msg}</span>`;
+    resultEl.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> كود غير معروف: ${code}</span>`;
     playBeep(false);
     return;
   }
@@ -2552,7 +2711,7 @@ function sendWelcomeWA(studentId) {
   if (!s) return;
   const today = new Date().toLocaleDateString('ar-EG');
   const typeLabel = s.type === 'private' ? 'برايفيت' : 'سنتر';
-  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\nالسلام عليكم ورحمة الله وبركاته،\nتحية طيبة وبعد..\n\nتم تسجيل الطالب: *${s.name}* بنجاح في منصة الأوربيتالي.\nنُبارك لحضرتك هذا التسجيل ونهنئك بانضمام ابنك إلى المنصة 🎉\n\n📚 *الصف الدراسي:* ${s.grade}\n🏷️ *نوع التسجيل:* ${typeLabel}\n📅 *تاريخ الالتحاق:* ${today}\n\nسيتم إخطار حضرتك بتقارير الحضور والدرجات بشكل منتظم إن شاء الله 📊\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
+  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\nالسلام عليكم ورحمة الله وبركاته،\nتحية طيبة وبعد..\n\nتم تسجيل الطالب: *${s.name}* بنجاح في منصة الأوربيتالي.\nنُبارك لحضرتك هذا التسجيل ونهنئك بانضمام ابنك إلى المنصة 🎉\n\n📚 *الصف الدراسي:* ${s.grade}\n🏷️ *نوع التسجيل:* ${typeLabel}\n📅 *تاريخ الالتحاق:* ${today}\n\nسيتم إخطار حضرتك بتقارير الحضور والدرجات بشكل منتظم إن شاء الله 📊\n\n📸 *تنبيه مهم:*\nمن فضلك أرسل صورة حديثة للطالب على هذا الرقم لاستخراج *كارنيه المنصة* الخاص بـ *${s.name}* 🪪\n\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
   openWA(s.phone, msg);
   // Mark welcome sent
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/welcome`).set(true);
@@ -2731,23 +2890,27 @@ function printSchedules() {
 function renderStats() {
   const container = document.getElementById('statsContent');
   if (!container) return;
-  const total = Object.values(students).length;
-  const private_ = Object.values(students).filter(s => s.type === 'private').length;
-  const center = Object.values(students).filter(s => s.type === 'center').length;
-  const paid = Object.values(students).filter(s => s.type === 'private' && monthData[s.id]?.paid).length;
+  // Active students only (exclude left)
+  const activeStudents = Object.values(students).filter(s => (s.status||'active') === 'active');
+  const leftStudents   = Object.values(students).filter(s => s.status === 'left');
+  const total    = activeStudents.length;
+  const private_ = activeStudents.filter(s => s.type === 'private').length;
+  const center   = activeStudents.filter(s => s.type === 'center').length;
+  const paid     = activeStudents.filter(s => s.type === 'private' && monthData[s.id]?.paid).length;
   let html = `<div class="stats-grid">
-    <div class="stat-card stat-accent"><div class="stat-icon">👥</div><div class="stat-val">${total}</div><div class="stat-label">إجمالي الطلاب</div></div>
+    <div class="stat-card stat-accent"><div class="stat-icon">👥</div><div class="stat-val">${total}</div><div class="stat-label">الطلاب النشطون</div></div>
     <div class="stat-card stat-info"><div class="stat-icon">🏠</div><div class="stat-val">${private_}</div><div class="stat-label">برايفيت</div></div>
     <div class="stat-card stat-secondary"><div class="stat-icon">🏫</div><div class="stat-val">${center}</div><div class="stat-label">سنتر</div></div>
     <div class="stat-card stat-success"><div class="stat-icon">💰</div><div class="stat-val">${paid}</div><div class="stat-label">دفعوا هذا الشهر</div></div>
     <div class="stat-card stat-danger"><div class="stat-icon">⏳</div><div class="stat-val">${private_ - paid}</div><div class="stat-label">لم يدفعوا بعد</div></div>
+    ${leftStudents.length ? `<div class="stat-card"><div class="stat-icon">🚪</div><div class="stat-val">${leftStudents.length}</div><div class="stat-label">غادروا الأوربيتالي</div></div>` : ''}
   </div>`;
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
   GRADES.forEach(grade => {
-    const gs = Object.values(students).filter(s => s.grade === grade);
+    const gs = activeStudents.filter(s => s.grade === grade);
     const gPrivate = gs.filter(s => s.type === 'private').length;
-    const gCenter = gs.filter(s => s.type === 'center').length;
-    const gPaid = gs.filter(s => s.type === 'private' && monthData[s.id]?.paid).length;
+    const gCenter  = gs.filter(s => s.type === 'center').length;
+    const gPaid    = gs.filter(s => s.type === 'private' && monthData[s.id]?.paid).length;
     if (!gs.length) return;
     html += `<div class="card">
       <div class="card-header"><span class="card-title"><i class="fas fa-users" style="color:var(--accent)"></i> ${grade}</span><span class="badge badge-accent">${gs.length} طالب</span></div>
@@ -3013,6 +3176,19 @@ document.addEventListener('DOMContentLoaded', () => {
   .schedule-day-row i { color: #0066cc !important; }
 }
 </style>
+
+<!-- Service Worker Registration (Offline Support) -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').then(function(reg) {
+      console.log('SW registered:', reg.scope);
+    }).catch(function(err) {
+      console.log('SW registration failed:', err);
+    });
+  });
+}
+</script>
 
 </body>
 </html>
