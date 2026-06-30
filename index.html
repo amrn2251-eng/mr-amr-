@@ -644,6 +644,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
         <div class="page-title"><i class="fas fa-users"></i> سجل الطلاب</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="openAddStudent()"><i class="fas fa-plus"></i> إضافة طالب</button>
+          <button class="btn" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.4)" onclick="openGroupWA()"><i class="fab fa-whatsapp"></i> جروب ولي الأمر</button>
         </div>
       </div>
       <div class="filter-bar">
@@ -1240,6 +1241,35 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('changePinModal')">إلغاء</button>
       <button class="btn btn-warning" onclick="doChangeSafePin()"><i class="fas fa-save"></i> حفظ الرمز</button>
+    </div>
+  </div>
+</div>
+
+<!-- Group WA Modal -->
+<div class="modal-backdrop" id="groupWAModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title"><i class="fab fa-whatsapp" style="color:#25d366"></i> ضم أولياء الأمور في جروب</span>
+      <button class="modal-close" onclick="closeModal('groupWAModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="form-group">
+      <label>اختر المرحلة الدراسية</label>
+      <select id="groupGradeSelect" class="form-control" onchange="renderGroupList()">
+        <option value="">-- اختر المرحلة --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>رابط الجروب (اختياري — لو عندك جروب موجود)</label>
+      <input type="text" id="groupLink" class="form-control" placeholder="https://chat.whatsapp.com/xxxxx" oninput="renderGroupList()">
+    </div>
+    <div id="groupListPreview" style="margin-top:8px"></div>
+    <div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <span id="groupCount" style="color:var(--text-secondary);font-size:0.88rem;align-self:center"></span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="closeModal('groupWAModal')">إغلاق</button>
+        <button class="btn" style="background:rgba(37,211,102,0.2);color:#25d366;border:1px solid rgba(37,211,102,0.4)"
+          onclick="sendGroupInviteAll()"><i class="fab fa-whatsapp"></i> إرسال الدعوة للكل</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3728,6 +3758,119 @@ function renderBooks() {
     <div class="stat-card stat-danger"><div class="stat-icon">💸</div><div class="stat-val">${sumCost.toLocaleString('ar-EG')}</div><div class="stat-label">إجمالي التكاليف</div></div>
     <div class="stat-card stat-accent"><div class="stat-icon">💵</div><div class="stat-val">${sumRevenue.toLocaleString('ar-EG')}</div><div class="stat-label">إيرادات الكتب المتوقعة</div></div>
     <div class="stat-card ${sumProfit>=0?'stat-success':'stat-danger'}"><div class="stat-icon">📈</div><div class="stat-val">${sumProfit.toLocaleString('ar-EG')}</div><div class="stat-label">صافي الربح من الكتب</div></div>`;
+}
+
+// =============================================
+// GROUP WHATSAPP
+// =============================================
+function openGroupWA() {
+  // ملء قائمة الصفوف
+  const sel = document.getElementById('groupGradeSelect');
+  sel.innerHTML = '<option value="">-- اختر المرحلة --</option>';
+  GRADES.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g; opt.textContent = g;
+    sel.appendChild(opt);
+  });
+  document.getElementById('groupLink').value = '';
+  document.getElementById('groupListPreview').innerHTML = '';
+  document.getElementById('groupCount').textContent = '';
+  openModal('groupWAModal');
+}
+
+function renderGroupList() {
+  const grade = document.getElementById('groupGradeSelect').value;
+  const link  = document.getElementById('groupLink').value.trim();
+  const preview = document.getElementById('groupListPreview');
+  const countEl = document.getElementById('groupCount');
+
+  if (!grade) {
+    preview.innerHTML = '<div class="empty-state" style="padding:20px"><i class="fas fa-filter"></i><p>اختر المرحلة أولاً</p></div>';
+    countEl.textContent = '';
+    return;
+  }
+
+  // جمع أولياء الأمور من نفس المرحلة (لهم رقم واتساب)
+  const parents = Object.values(students).filter(s =>
+    s.grade === grade &&
+    s.phone && s.phone !== 'none' &&
+    (s.status || 'active') === 'active'
+  );
+
+  // إزالة أرقام مكررة (لو ولي أمر عنده أكتر من طالب)
+  const seen = new Set();
+  const unique = parents.filter(s => {
+    if (seen.has(s.phone)) return false;
+    seen.add(s.phone); return true;
+  });
+
+  countEl.textContent = `${unique.length} ولي أمر من ${grade}`;
+
+  if (!unique.length) {
+    preview.innerHTML = '<div class="empty-state" style="padding:20px"><i class="fas fa-users-slash"></i><p>لا يوجد أولياء أمور بأرقام مسجلة في هذه المرحلة</p></div>';
+    return;
+  }
+
+  const linkNote = link
+    ? `<div style="background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.3);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:0.85rem;color:#25d366"><i class="fab fa-whatsapp"></i> سيتم إرسال رابط الجروب: <strong>${link}</strong></div>`
+    : `<div style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:0.85rem;color:var(--warning)"><i class="fas fa-info-circle"></i> لم تضف رابط جروب — سيُرسل إشعار فقط بدون رابط</div>`;
+
+  preview.innerHTML = linkNote + `
+    <div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>اسم الطالب</th><th>رقم ولي الأمر</th><th>إرسال فردي</th></tr></thead>
+      <tbody>${unique.map((s, i) => `<tr>
+        <td>${i+1}</td>
+        <td><strong>${s.name}</strong></td>
+        <td dir="ltr">${s.phone}</td>
+        <td><button class="btn btn-xs" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)"
+          onclick="sendSingleGroupInvite('${s.phone}','${s.name}','${grade}')">
+          <i class="fab fa-whatsapp"></i> إرسال
+        </button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+function buildGroupMsg(parentName, studentName, grade, link) {
+  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n────────────────────\nالسلام عليكم ورحمة الله وبركاته،\n\nنتشرف بدعوة حضرتكم للانضمام إلى جروب واتساب الخاص بـ *${grade}*\n\n👶 ولي أمر الطالب: *${studentName}*\n\nالجروب خاص بمتابعة:\n📚 الحضور والدرجات\n📊 التقارير الشهرية\n📢 الإعلانات والمواعيد الهامة\n${link ? `\n🔗 *رابط الانضمام للجروب:*\n${link}\n` : ''}\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
+  return msg;
+}
+
+function sendSingleGroupInvite(phone, studentName, grade) {
+  const link = document.getElementById('groupLink').value.trim();
+  const msg = buildGroupMsg('', studentName, grade, link);
+  const clean = phone.replace(/\D/g, '');
+  const intl = clean.startsWith('0') ? '2' + clean : clean;
+  window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function sendGroupInviteAll() {
+  const grade = document.getElementById('groupGradeSelect').value;
+  if (!grade) { toast('اختر المرحلة أولاً', 'error'); return; }
+  const link = document.getElementById('groupLink').value.trim();
+
+  const parents = Object.values(students).filter(s =>
+    s.grade === grade && s.phone && s.phone !== 'none' && (s.status||'active') === 'active'
+  );
+  const seen = new Set();
+  const unique = parents.filter(s => {
+    if (seen.has(s.phone)) return false;
+    seen.add(s.phone); return true;
+  });
+
+  if (!unique.length) { toast('لا يوجد أولياء أمور بأرقام مسجلة', 'warning'); return; }
+
+  let delay = 0;
+  unique.forEach((s, i) => {
+    setTimeout(() => {
+      const msg = buildGroupMsg('', s.name, grade, link);
+      const clean = s.phone.replace(/\D/g, '');
+      const intl = clean.startsWith('0') ? '2' + clean : clean;
+      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
+    }, delay);
+    delay += 600; // فترة بين كل رسالة عشان المتصفح ميبلوكش
+  });
+
+  toast(`تم فتح ${unique.length} رسالة واتساب 📲`, 'success');
 }
 
 // =============================================
