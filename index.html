@@ -6,505 +6,7 @@
 <title>منصة الأوربيتالي - مستر عمرو عبد الرازق</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-<style>
-:root {
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-card: #1e2530;
-  --bg-card2: #252d3a;
-  --bg-input: #1a2030;
-  --border: #30363d;
-  --border-light: #3d4451;
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #6e7681;
-  --accent: #4f8ef7;
-  --accent-hover: #3b7de8;
-  --accent2: #7c5cfc;
-  --success: #3fb950;
-  --success-bg: #1a3a24;
-  --danger: #f85149;
-  --danger-bg: #3a1a1a;
-  --warning: #d29922;
-  --warning-bg: #3a2e10;
-  --info: #58a6ff;
-  --gold: #f0c040;
-  --silver: #a0aec0;
-  --bronze: #cd7f32;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 48px rgba(0,0,0,0.6);
-  --transition: all 0.2s ease;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'Cairo', sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100vh;
-  direction: rtl;
-  overflow-x: hidden;
-}
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-secondary); }
-::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
-a { color: var(--accent); text-decoration: none; }
-
-/* SPLASH */
-#splash {
-  position: fixed; inset: 0; z-index: 9999;
-  background: linear-gradient(135deg, #0d1117 0%, #1a1f2e 50%, #0d1117 100%);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 24px;
-}
-.splash-planet { font-size: 80px; animation: float 3s ease-in-out infinite; }
-@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-16px)} }
-.splash-title {
-  font-size: 2.2rem; font-weight: 900;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.splash-sub { color: var(--text-secondary); font-size: 1.1rem; }
-.splash-btn {
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: #fff; border: none; padding: 14px 48px; border-radius: 50px;
-  font-family: 'Cairo', sans-serif; font-size: 1.1rem; font-weight: 700;
-  cursor: pointer; box-shadow: 0 4px 20px rgba(79,142,247,0.4);
-  transition: var(--transition);
-}
-.splash-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(79,142,247,0.6); }
-
-/* LOGIN */
-#loginScreen {
-  position: fixed; inset: 0; z-index: 9998;
-  background: var(--bg-primary);
-  display: none; align-items: center; justify-content: center;
-}
-.login-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 20px; padding: 48px 40px;
-  width: 100%; max-width: 440px;
-  box-shadow: var(--shadow-lg);
-}
-.login-logo { text-align: center; margin-bottom: 32px; }
-.login-logo .planet { font-size: 48px; }
-.login-logo h2 { font-size: 1.5rem; font-weight: 800; margin-top: 8px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.login-logo p { color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; }
-.tab-switch {
-  display: flex; background: var(--bg-secondary); border-radius: var(--radius-sm);
-  padding: 4px; margin-bottom: 24px;
-}
-.tab-switch button {
-  flex: 1; background: none; border: none; padding: 10px;
-  border-radius: var(--radius-sm); color: var(--text-secondary);
-  font-family: 'Cairo', sans-serif; font-size: 0.95rem; font-weight: 600;
-  cursor: pointer; transition: var(--transition);
-}
-.tab-switch button.active {
-  background: var(--accent); color: #fff;
-  box-shadow: 0 2px 8px rgba(79,142,247,0.4);
-}
-.form-group { margin-bottom: 18px; }
-.form-group label { display: block; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 6px; }
-.form-control {
-  width: 100%; background: var(--bg-input); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 12px 16px; color: var(--text-primary);
-  font-family: 'Cairo', sans-serif; font-size: 1rem;
-  transition: var(--transition); outline: none;
-}
-.form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,0.15); }
-.btn-primary {
-  width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: #fff; border: none; padding: 13px; border-radius: var(--radius-sm);
-  font-family: 'Cairo', sans-serif; font-size: 1rem; font-weight: 700;
-  cursor: pointer; transition: var(--transition);
-}
-.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-.login-err { color: var(--danger); font-size: 0.88rem; margin-top: 10px; text-align: center; display: none; }
-</style>
-<style>
-/* APP SHELL */
-#app { display: none; min-height: 100vh; }
-.topbar {
-  position: fixed; top: 0; right: 0; left: 0; z-index: 100;
-  height: 60px; background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 20px; box-shadow: var(--shadow);
-}
-.topbar-brand { display: flex; align-items: center; gap: 10px; }
-.topbar-brand .planet { font-size: 1.5rem; }
-.topbar-brand h1 { font-size: 1rem; font-weight: 800;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.topbar-right { display: flex; align-items: center; gap: 12px; }
-.topbar-month {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 6px 12px;
-  color: var(--text-primary); font-family: 'Cairo', sans-serif; font-size: 0.88rem;
-  outline: none; cursor: pointer;
-}
-.topbar-user { color: var(--text-secondary); font-size: 0.9rem; }
-.btn-icon {
-  background: none; border: none; color: var(--text-secondary);
-  cursor: pointer; padding: 8px; border-radius: var(--radius-sm);
-  transition: var(--transition); font-size: 1rem;
-}
-.btn-icon:hover { background: var(--bg-card); color: var(--text-primary); }
-
-/* SIDEBAR */
-.sidebar {
-  position: fixed; top: 60px; right: 0; bottom: 0; z-index: 90;
-  width: 220px; background: var(--bg-secondary);
-  border-left: 1px solid var(--border);
-  overflow-y: auto; transition: var(--transition);
-  padding: 12px 0;
-}
-.sidebar.collapsed { width: 60px; }
-.nav-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 11px 18px; cursor: pointer;
-  border-radius: var(--radius-sm); margin: 2px 8px;
-  color: var(--text-secondary); font-size: 0.92rem; font-weight: 500;
-  transition: var(--transition); white-space: nowrap;
-}
-.nav-item:hover { background: var(--bg-card); color: var(--text-primary); }
-.nav-item.active {
-  background: linear-gradient(135deg, rgba(79,142,247,0.2), rgba(124,92,252,0.2));
-  color: var(--accent); border-right: 3px solid var(--accent);
-}
-.nav-item i { width: 20px; text-align: center; font-size: 1rem; flex-shrink: 0; }
-.nav-label { transition: var(--transition); }
-.sidebar.collapsed .nav-label { opacity: 0; width: 0; overflow: hidden; }
-
-/* MAIN CONTENT */
-.main-content {
-  margin-right: 220px; margin-top: 60px;
-  padding: 24px; transition: var(--transition);
-  min-height: calc(100vh - 60px);
-}
-.main-content.expanded { margin-right: 60px; }
-
-/* TABS */
-.tab-page { display: none; }
-.tab-page.active { display: block; }
-
-/* PAGE HEADER */
-.page-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
-}
-.page-title { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
-.page-title i { color: var(--accent); }
-
-/* CARDS */
-.card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 20px; margin-bottom: 20px;
-  box-shadow: var(--shadow);
-}
-.card-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 16px; padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.card-title { font-size: 1rem; font-weight: 700; }
-
-/* BUTTONS */
-.btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 9px 18px; border-radius: var(--radius-sm);
-  font-family: 'Cairo', sans-serif; font-size: 0.9rem; font-weight: 600;
-  cursor: pointer; border: none; transition: var(--transition);
-}
-.btn-sm { padding: 5px 11px; font-size: 0.82rem; }
-.btn-xs { padding: 3px 8px; font-size: 0.78rem; }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-success { background: var(--success); color: #fff; }
-.btn-success:hover { filter: brightness(0.9); }
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { filter: brightness(0.9); }
-.btn-warning { background: var(--warning); color: #000; }
-.btn-secondary {
-  background: var(--bg-card2); color: var(--text-primary);
-  border: 1px solid var(--border);
-}
-.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-.btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
-.btn-ghost:hover { background: var(--bg-card2); }
-.btn-outline-accent { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-.btn-outline-accent:hover { background: var(--accent); color: #fff; }
-
-/* TABLE */
-.table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-thead tr { background: var(--bg-card2); }
-th { padding: 11px 12px; text-align: right; color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
-td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-tr:hover td { background: rgba(255,255,255,0.02); }
-tr:last-child td { border-bottom: none; }
-
-/* BADGES */
-.badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: 50px; font-size: 0.78rem; font-weight: 600;
-}
-.badge-success { background: var(--success-bg); color: var(--success); }
-.badge-danger { background: var(--danger-bg); color: var(--danger); }
-.badge-warning { background: var(--warning-bg); color: var(--warning); }
-.badge-info { background: rgba(88,166,255,0.1); color: var(--info); }
-.badge-accent { background: rgba(79,142,247,0.15); color: var(--accent); }
-.badge-secondary { background: var(--bg-card2); color: var(--text-secondary); }
-
-/* MODAL */
-.modal-backdrop {
-  position: fixed; inset: 0; z-index: 500;
-  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
-  display: none; align-items: center; justify-content: center; padding: 20px;
-}
-.modal-backdrop.open { display: flex; }
-.modal {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 28px; width: 100%; max-width: 580px;
-  max-height: 90vh; overflow-y: auto;
-  box-shadow: var(--shadow-lg); position: relative;
-  animation: modalIn 0.2s ease;
-}
-.modal-lg { max-width: 800px; }
-.modal-sm { max-width: 420px; }
-@keyframes modalIn { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
-.modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
-}
-.modal-title { font-size: 1.1rem; font-weight: 800; }
-.modal-close {
-  background: none; border: none; color: var(--text-secondary);
-  cursor: pointer; font-size: 1.2rem; padding: 4px;
-  transition: var(--transition);
-}
-.modal-close:hover { color: var(--danger); }
-.modal-footer { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border);
-  display: flex; gap: 10px; justify-content: flex-end; }
-
-/* FORM */
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
-.form-group { margin-bottom: 14px; }
-.form-group label { display: block; color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 5px; font-weight: 500; }
-select.form-control { cursor: pointer; }
-textarea.form-control { resize: vertical; min-height: 80px; }
-
-/* STATS CARDS */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.stat-card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 18px 16px;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.stat-card .stat-icon { font-size: 1.6rem; }
-.stat-card .stat-val { font-size: 1.8rem; font-weight: 800; color: var(--text-primary); }
-.stat-card .stat-label { font-size: 0.82rem; color: var(--text-secondary); }
-.stat-accent { border-color: rgba(79,142,247,0.4); }
-.stat-success { border-color: rgba(63,185,80,0.4); }
-.stat-danger { border-color: rgba(248,81,73,0.4); }
-.stat-warning { border-color: rgba(210,153,34,0.4); }
-
-/* TOAST */
-.toast-container {
-  position: fixed; top: 70px; left: 20px; z-index: 9000;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.toast {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 12px 16px;
-  display: flex; align-items: center; gap: 10px;
-  font-size: 0.9rem; box-shadow: var(--shadow);
-  animation: slideIn 0.3s ease; min-width: 260px; max-width: 340px;
-}
-@keyframes slideIn { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
-.toast.success { border-right: 3px solid var(--success); }
-.toast.error { border-right: 3px solid var(--danger); }
-.toast.info { border-right: 3px solid var(--accent); }
-.toast.warning { border-right: 3px solid var(--warning); }
-
-/* HONOR ROLL */
-.honor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-.honor-card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden;
-}
-.honor-card-header {
-  background: linear-gradient(135deg, rgba(79,142,247,0.2), rgba(124,92,252,0.2));
-  padding: 14px 18px; font-weight: 700; font-size: 1rem;
-  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;
-}
-.rank-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-.rank-item:last-child { border-bottom: none; }
-.rank-num {
-  width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 1rem; flex-shrink: 0;
-}
-.rank-1 { background: linear-gradient(135deg, #f0c040, #f0a500); color: #000; }
-.rank-2 { background: linear-gradient(135deg, #a0aec0, #718096); color: #000; }
-.rank-3 { background: linear-gradient(135deg, #cd7f32, #a0522d); color: #fff; }
-.rank-info { flex: 1; }
-.rank-name { font-weight: 700; font-size: 0.95rem; }
-.rank-score { font-size: 0.82rem; color: var(--text-secondary); }
-
-/* ATTENDANCE TAB */
-.att-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-.att-summary {
-  background: rgba(79,142,247,0.1); border: 1px solid rgba(79,142,247,0.3);
-  border-radius: var(--radius-sm); padding: 10px 16px;
-  font-size: 0.92rem; font-weight: 600; color: var(--accent);
-}
-.session-btns { display: flex; gap: 4px; flex-wrap: wrap; }
-.sess-btn {
-  width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--bg-card2); color: var(--text-muted);
-  cursor: pointer; font-size: 0.78rem; font-weight: 700; transition: var(--transition);
-  display: flex; align-items: center; justify-content: center;
-}
-.sess-btn.present { background: var(--success-bg); border-color: var(--success); color: var(--success); }
-.sess-btn.absent { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
-.exam-inputs { display: flex; gap: 4px; flex-wrap: wrap; }
-.exam-inp {
-  width: 44px; height: 32px; background: var(--bg-input); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--text-primary); text-align: center;
-  font-family: 'Cairo', sans-serif; font-size: 0.82rem; outline: none;
-  transition: var(--transition);
-}
-.exam-inp:focus { border-color: var(--accent); }
-.exam-inp.filled { border-color: rgba(79,142,247,0.5); }
-
-/* BARCODE */
-#barcodeVideo { width: 100%; border-radius: var(--radius-sm); background: #000; max-height: 280px; }
-.scan-result {
-  margin-top: 12px; padding: 14px; border-radius: var(--radius-sm);
-  background: var(--bg-card2); border: 1px solid var(--border);
-  font-size: 0.92rem; min-height: 60px;
-}
-
-/* SCHEDULE CARDS */
-.schedule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-.schedule-card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 18px; position: relative;
-}
-.schedule-card .grade-tag {
-  font-size: 0.8rem; font-weight: 700; color: var(--accent);
-  background: rgba(79,142,247,0.1); border: 1px solid rgba(79,142,247,0.3);
-  border-radius: 50px; padding: 3px 10px; margin-bottom: 10px; display: inline-block;
-}
-.schedule-day-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 0.88rem; }
-.schedule-day-row i { color: var(--accent); width: 16px; }
-.sched-actions { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; }
-
-/* REPORTS */
-.reports-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-.report-tab-btn {
-  background: var(--bg-card); border: 1px solid var(--border);
-  padding: 8px 16px; border-radius: var(--radius-sm);
-  color: var(--text-secondary); font-family: 'Cairo', sans-serif; font-size: 0.9rem;
-  cursor: pointer; transition: var(--transition); font-weight: 600;
-}
-.report-tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-/* SAFE */
-.safe-lock {
-  text-align: center; padding: 60px 20px;
-}
-.safe-lock i { font-size: 4rem; color: var(--warning); margin-bottom: 16px; }
-.safe-pin-inputs { display: flex; justify-content: center; gap: 8px; margin: 20px 0; }
-.pin-digit {
-  width: 56px; height: 64px; background: var(--bg-input); border: 2px solid var(--border);
-  border-radius: var(--radius-sm); color: var(--text-primary); text-align: center;
-  font-family: 'Cairo', sans-serif; font-size: 1.5rem; font-weight: 700; outline: none;
-  transition: var(--transition);
-}
-.pin-digit:focus { border-color: var(--warning); }
-
-/* PARENT PORTAL */
-.parent-card {
-  max-width: 560px; margin: 0 auto;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden;
-}
-.parent-card-header {
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  padding: 24px; text-align: center;
-}
-.parent-card-header h2 { font-size: 1.3rem; font-weight: 800; }
-.parent-card-body { padding: 24px; }
-.info-row { display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-.info-row:last-child { border-bottom: none; }
-.info-label { color: var(--text-secondary); }
-.info-val { font-weight: 600; }
-
-/* FILTER BAR */
-.filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
-.filter-bar .form-group { margin-bottom: 0; }
-.filter-bar select, .filter-bar input { min-width: 160px; }
-
-/* EMPTY STATE */
-.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
-.empty-state i { font-size: 3rem; margin-bottom: 12px; display: block; }
-.empty-state p { font-size: 0.95rem; }
-
-/* DANGER ZONE */
-.danger-zone {
-  border: 1px solid var(--danger); border-radius: var(--radius);
-  padding: 20px; margin-top: 20px;
-}
-.danger-zone h3 { color: var(--danger); margin-bottom: 12px; }
-
-/* RESPONSIVE */
-@media (max-width: 768px) {
-  .sidebar { transform: translateX(100%); }
-  .sidebar.mobile-open { transform: translateX(0); }
-  .main-content { margin-right: 0; }
-  .main-content.expanded { margin-right: 0; }
-  .form-row { grid-template-columns: 1fr; }
-  .form-row-3 { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-
-  /* ── Topbar compact on mobile ── */
-  .topbar {
-    height: 54px !important;
-    padding: 0 10px;
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-  .topbar-brand img { display: none; }
-  .topbar-brand p   { font-size: 0.7rem; color: var(--text-secondary); display: block; }
-  .topbar-brand h1  { font-size: 0.82rem; }
-  #term-badge       { display: none !important; }
-  #yearSelector     { display: none; }           /* hide year selector — use month only */
-  #monthSelector    { max-width: 100px; font-size: 0.75rem; padding: 4px 6px; }
-  .topbar-right     { gap: 4px; }
-  .topbar-user      { display: none; }           /* hide username text */
-  .btn-icon         { padding: 5px; font-size: 0.88rem; }
-
-  /* Main content starts right below fixed topbar */
-  .main-content { margin-top: 54px !important; padding: 12px; }
-
-  /* Bigger tap targets for action buttons */
-  td .btn-xs { padding: 6px 10px; font-size: 0.82rem; }
-}
-@media print {
-  .topbar, .sidebar, .page-header .btn, .no-print { display: none !important; }
-  .main-content { margin: 0; padding: 0; }
-  body { background: #fff; color: #000; }
-}
-</style>
+<link rel="stylesheet" href="style.css">
 
 <!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -550,7 +52,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           </button>
         </div>
       </div>
-      <button class="btn-primary" onclick="doTeacherLogin()"><i class="fas fa-sign-in-alt"></i> دخول</button>
+      <button class="btn btn-primary" style="width:100%" onclick="doTeacherLogin()"><i class="fas fa-sign-in-alt"></i> دخول</button>
     </div>
     <div id="parentLoginForm" style="display:none">
       <div style="display:flex;background:var(--bg-secondary);border-radius:var(--radius-sm);padding:3px;margin-bottom:14px;gap:2px">
@@ -571,7 +73,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
         <input type="text" id="parentCodeInput" class="form-control" placeholder="أدخل كود الطالب"
           onkeydown="if(event.key==='Enter') doParentLogin()">
       </div>
-      <button class="btn-primary" onclick="doParentLogin()"><i class="fas fa-sign-in-alt"></i> عرض بيانات ابني</button>
+      <button class="btn btn-primary" style="width:100%" onclick="doParentLogin()"><i class="fas fa-sign-in-alt"></i> عرض بيانات ابني</button>
     </div>
     <div class="login-err" id="loginErr"></div>
   </div>
@@ -811,6 +313,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
         <div class="page-title"><i class="fas fa-calendar-alt"></i> الجداول الدراسية</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary" onclick="openAddSchedule()"><i class="fas fa-plus"></i> إضافة جدول</button>
+          <button class="btn" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.4)" onclick="openSendScheduleModal()"><i class="fab fa-whatsapp"></i> إرسال لأولياء الأمور</button>
           <button class="btn btn-secondary" onclick="printSchedules()"><i class="fas fa-print"></i> طباعة</button>
         </div>
       </div>
@@ -908,6 +411,17 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           <div id="observerStatus" style="margin-top:8px;font-size:0.82rem;color:var(--text-muted)"></div>
         </div>
         <!-- /Observer Accounts -->
+        <!-- WhatsApp Group Links -->
+        <div class="card wa-group-links-card" style="margin-top:16px">
+          <div class="card-header">
+            <span class="card-title"><i class="fab fa-whatsapp" style="color:#25d366"></i> لينكات جروبات الواتساب</span>
+            <button class="btn btn-xs btn-secondary" onclick="saveWAGroupLinks()"><i class="fas fa-save"></i> حفظ</button>
+          </div>
+          <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:16px">ضع رابط جروب واتساب لكل مرحلة — سيظهر لولي الأمر زر "انضمام للجروب" تلقائياً.</p>
+          <div id="wa-group-links-list"></div>
+          <div id="waGroupLinksStatus" style="margin-top:8px;font-size:0.82rem;color:var(--text-muted)"></div>
+        </div>
+        <!-- /WhatsApp Group Links -->
         <div class="card" style="margin-top:16px;border-color:rgba(124,92,252,0.4)">
           <div class="card-header">
             <span class="card-title"><i class="fas fa-user-shield" style="color:var(--accent2)"></i> حسابات المساعدين</span>
@@ -1752,6 +1266,7 @@ function doLogout() {
   currentUser = null; parentStudentId = null;
   currentAssistantCenter = ''; currentAssistantType = '';
   parentStudentIds = [];
+  _currentTab = 'students'; _historyStack = [];
   // إزالة observer style لو موجود
   const obs = document.getElementById('observerStyle');
   if (obs) obs.remove();
@@ -1766,6 +1281,8 @@ function doLogout() {
   // restore key button visibility
   const keyBtn = document.querySelector('button[onclick="openChangeAdminPass()"]');
   if (keyBtn) keyBtn.style.display = '';
+  // أعد تعيين الـ history لتفادي الرجوع للتطبيق بعد الخروج
+  history.replaceState({ appState: 'logged-out' }, '', window.location.pathname);
 }
 
 // =============================================
@@ -2122,13 +1639,15 @@ async function loadAllData() {
     loadIncomes(),
     loadBooks()
   ]);
+  // تحميل لينكات الجروبات (ضروري لبوابة ولي الأمر)
+  loadWAGroupLinks();
 }
 
 function loadStudents() {
   return new Promise(resolve => {
     db.ref('students').on('value', snap => {
       students = snap.val() || {};
-      if (currentUser === 'admin') {
+      if (currentUser === 'admin' || currentUser === 'assistant' || currentUser === 'observer') {
         renderStudentsTable();
         renderHonorRoll();
         renderAttendanceTable();
@@ -2144,13 +1663,13 @@ function loadMonthData() {
   return new Promise(resolve => {
     db.ref(`monthData/${currentMonth}`).on('value', snap => {
       monthData = snap.val() || {};
-      if (currentUser === 'admin') {
+      if (currentUser === 'admin' || currentUser === 'assistant' || currentUser === 'observer') {
         renderStudentsTable();
         renderHonorRoll();
         renderAttendanceTable();
         renderStats();
         renderReports();
-        renderIncomes();
+        if (currentUser === 'admin') renderIncomes();
       } else if (currentUser === 'parent') {
         renderParentPortal();
       }
@@ -2182,6 +1701,13 @@ function loadIncomes() {
 // =============================================
 // NAVIGATION
 // =============================================
+// =============================================
+// BACK BUTTON SUPPORT (Mobile)
+// =============================================
+// نمنع الخروج التام من الموقع ونعالج زر الرجوع بشكل صحيح
+let _currentTab = 'students';
+let _historyStack = []; // تتبع تاريخ التنقل
+
 function showTab(tab) {
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -2200,7 +1726,51 @@ function showTab(tab) {
   if (tab === 'archive') { loadArchivedMonths(); }
   if (tab !== 'barcode' && scannerRunning) stopScanner();
   if (tab === 'barcode') { setTimeout(loadCameras, 300); }
+
+  // دعم زر الرجوع — نضيف state بس لو تغيّر التاب
+  if (_currentTab !== tab) {
+    _historyStack.push(_currentTab);
+    _currentTab = tab;
+    if (history.pushState) {
+      history.pushState({ tab, appState: 'in-app' }, '', '#' + tab);
+    }
+  }
 }
+
+// نضيف state أولي عند تحميل الصفحة لمنع الخروج
+window.addEventListener('load', function() {
+  // نضيف entry فارغة في البداية لنمنع الخروج عند أول رجوع
+  if (history.pushState) {
+    history.pushState({ tab: 'students', appState: 'in-app' }, '', '#students');
+  }
+});
+
+window.addEventListener('popstate', e => {
+  if (e.state && e.state.appState === 'in-app' && e.state.tab) {
+    // نتنقل للتاب بدون إضافة history جديد
+    const tab = e.state.tab;
+    _currentTab = tab;
+    document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const page = document.getElementById(`tab-${tab}`);
+    const nav  = document.getElementById(`nav-${tab}`);
+    if (page) page.classList.add('active');
+    if (nav)  nav.classList.add('active');
+    if (tab !== 'safe') lockSafe();
+    if (tab === 'honor')     renderHonorRoll();
+    if (tab === 'stats')     renderStats();
+    if (tab === 'reports')   renderReports();
+    if (tab === 'schedules') renderSchedules();
+    if (tab === 'parent')    renderParentPortal();
+    if (tab !== 'barcode' && scannerRunning) stopScanner();
+  } else {
+    // لا يوجد state صحيح — منع الخروج من الموقع وإرجاع المستخدم للداخل
+    if (document.getElementById('app') && document.getElementById('app').style.display !== 'none') {
+      // المستخدم داخل التطبيق — أعد توجيهه للتاب الحالي بدل الخروج
+      history.pushState({ tab: _currentTab || 'students', appState: 'in-app' }, '', '#' + (_currentTab || 'students'));
+    }
+  }
+});
 
 function toggleSidebar() {
   sidebarCollapsed = !sidebarCollapsed;
@@ -2226,6 +1796,8 @@ function toast(msg, type='info', dur=3000) {
   el.className = `toast ${type}`;
   el.innerHTML = `<i class="${icons[type]||icons.info}" style="color:${colors[type]||colors.info}"></i><span>${msg}</span>`;
   document.getElementById('toastContainer').appendChild(el);
+  // صوت الإجراء
+  playBeep(type !== 'error');
   setTimeout(() => el.remove(), dur);
 }
 
@@ -2246,32 +1818,91 @@ document.addEventListener('click', e => {
 });
 
 // =============================================
-// BEEP SOUND
+// BEEP SOUND — أصوات متنوعة حسب نوع الإجراء
 // =============================================
 function playBeep(success=true) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
+    gain.connect(ctx.destination);
+
     if (success) {
-      // Cashier-style double beep
-      osc.frequency.setValueAtTime(1046, ctx.currentTime);       // C6
-      osc.frequency.setValueAtTime(1318, ctx.currentTime + 0.1); // E6
-      osc.type = 'square';
-      gain.gain.setValueAtTime(0.35, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.22);
+      // نغمة نجاح — double beep تصاعدي
+      [0, 0.12].forEach((t, i) => {
+        const o = ctx.createOscillator();
+        o.connect(gain);
+        o.type = 'sine';
+        o.frequency.value = i === 0 ? 880 : 1100;
+        gain.gain.setValueAtTime(0, ctx.currentTime + t);
+        gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.12);
+        o.start(ctx.currentTime + t);
+        o.stop(ctx.currentTime + t + 0.12);
+      });
     } else {
-      // Error low tone
-      osc.frequency.value = 220;
-      osc.type = 'sawtooth';
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.4);
+      // نغمة خطأ — نغمة هابطة واحدة
+      const o = ctx.createOscillator();
+      o.connect(gain);
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(400, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      o.start(ctx.currentTime);
+      o.stop(ctx.currentTime + 0.35);
     }
+  } catch(e) {}
+}
+
+// نغمة دفع (cash register)
+function playPaySound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    [0, 0.1, 0.2].forEach((t, i) => {
+      const o = ctx.createOscillator();
+      o.connect(gain);
+      o.type = 'square';
+      o.frequency.value = [523, 659, 784][i]; // C5 E5 G5
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.09);
+      o.start(ctx.currentTime + t);
+      o.stop(ctx.currentTime + t + 0.09);
+    });
+  } catch(e) {}
+}
+
+// نغمة تحذير
+function playWarnSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const gain = ctx.createGain();
+    o.connect(gain); gain.connect(ctx.destination);
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(600, ctx.currentTime);
+    o.frequency.setValueAtTime(400, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+// نغمة QR scan
+function playScanSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const gain = ctx.createGain();
+    o.connect(gain); gain.connect(ctx.destination);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(1200, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.1);
   } catch(e) {}
 }
 
@@ -2358,8 +1989,13 @@ function saveStudent() {
   const joinDate  = document.getElementById('sJoinDate').value;
   const monthlyFee= type === 'private' ? (parseFloat(document.getElementById('sMonthlyFee').value)||0) : 0;
   const feeExempt = type === 'private' ? document.getElementById('sFeeExempt').checked : false;
-  const centerName= type === 'center' ? document.getElementById('sCenterName').value.trim() : '';
+  let   centerName= type === 'center' ? document.getElementById('sCenterName').value.trim() : '';
   const editId    = document.getElementById('sEditId').value;
+
+  // لو المساعد من نوع center — نملأ اسم السنتر تلقائياً
+  if (currentUser === 'assistant' && currentAssistantType === 'center' && currentAssistantCenter && !centerName) {
+    centerName = currentAssistantCenter;
+  }
 
   if (!name)  { toast('أدخل اسم الطالب','error'); return; }
   if (!noWA && !phone) { toast('أدخل رقم الواتساب أو اختر "ليس لديه واتساب"','error'); return; }
@@ -2379,6 +2015,11 @@ function saveStudent() {
   db.ref(`students/${id}`).set(data).then(() => {
     toast(editId ? 'تم تحديث البيانات' : 'تم إضافة الطالب بنجاح','success');
     closeModal('studentModal');
+    // ← تحديث فوري للواجهة عند المساعد بدون انتظار الـ listener
+    if (!editId) {
+      students[id] = data;
+      renderStudentsTable();
+    }
   }).catch(e => toast('خطأ في الحفظ: '+e.message,'error'));
 }
 
@@ -2421,7 +2062,7 @@ function confirmPay() {
   const id = pendingPayId;
   const today = new Date().toLocaleDateString('ar-EG');
   db.ref(`monthData/${currentMonth}/${id}`).update({ paid: true, payDate: today })
-    .then(() => { toast('تم تسجيل الدفع بنجاح','success'); closeModal('payModal'); pendingPayId = null; })
+    .then(() => { playPaySound(); toast('تم تسجيل الدفع بنجاح','success'); closeModal('payModal'); pendingPayId = null; })
     .catch(e => toast('خطأ','error'));
 }
 
@@ -2499,7 +2140,8 @@ function renderStudentsTable() {
           <button class="btn btn-xs btn-secondary" onclick="openEditStudent('${s.id}')" title="تعديل"><i class="fas fa-edit"></i></button>
           ${s.phone!=='none' ? `<button class="btn btn-xs" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')" title="ترحيب"><i class="fab fa-whatsapp"></i></button>
           <button class="btn btn-xs btn-outline-accent" onclick="sendDailyReport('${s.id}')" title="يومي"><i class="fas fa-sun"></i></button>
-          <button class="btn btn-xs" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')" title="شهري"><i class="fas fa-calendar"></i></button>` : ''}
+          <button class="btn btn-xs" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')" title="شهري"><i class="fas fa-calendar"></i></button>
+          <button class="btn btn-xs" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)" onclick="sendScheduleToParent('${s.id}')" title="إرسال الجدول"><i class="fas fa-calendar-alt"></i></button>` : ''}
           <button class="btn btn-xs btn-danger" onclick="openDeleteStudent('${s.id}')" title="حذف"><i class="fas fa-trash"></i></button>
         </div>
       </td>
@@ -2516,7 +2158,7 @@ function openStudentDetail(id) {
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === id);
-  const rankTxt = rankIdx >= 0 && rankIdx < 3 ? `${['الأول','الثاني','الثالث'][rankIdx]} في ${s.grade}` : 'لم يحصل على مركز من ضمن الـ 3 الأوائل';
+  const rankTxt = getRankText(rankIdx, s.grade, false);
   let sessHtml = '';
   for (let i = 1; i <= 8; i++) {
     const v = md.sessions?.[`s${i}`];
@@ -2560,6 +2202,7 @@ function openStudentDetail(id) {
       <button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')"><i class="fab fa-whatsapp"></i> ترحيب</button>
       <button class="btn btn-sm btn-outline-accent" onclick="sendDailyReport('${s.id}')"><i class="fas fa-sun"></i> يومي</button>
       <button class="btn btn-sm" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')"><i class="fas fa-calendar"></i> شهري</button>
+      <button class="btn btn-sm" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)" onclick="sendScheduleToParent('${s.id}')"><i class="fas fa-calendar-alt"></i> جدول</button>
     </div>`:''}`;
   openModal('studentDetailModal');
 }
@@ -2567,6 +2210,27 @@ function openStudentDetail(id) {
 // =============================================
 // HELPERS
 // =============================================
+
+// نص الترتيب — تشجيعي وبإيموجي واضح
+function getRankText(rankIdx, grade, forWA) {
+  if (rankIdx === 0) return forWA ? `🥇 الأول في ${grade}` : `🥇 الأول في ${grade}`;
+  if (rankIdx === 1) return forWA ? `🥈 الثاني في ${grade}` : `🥈 الثاني في ${grade}`;
+  if (rankIdx === 2) return forWA ? `🥉 الثالث في ${grade}` : `🥉 الثالث في ${grade}`;
+  // خارج الـ 3 الأوائل — رسائل تشجيعية بناءة
+  const encouragements = [
+    '💪 بيتحسن باستمرار — الترتيب الأعلى قريب!',
+    '🌟 كل شهر أحسن من اللي قبله — واصل!',
+    '🚀 مع المذاكرة المنتظمة هيتصدر القائمة!',
+    '✨ الشهر الجاي هيكون أقوى بإذن الله!',
+    '🎯 خطوة خطوة — النجاح قادم بإذن الله!',
+    '🌱 كل مجهود بيتحسب — واصل يا بطل!',
+  ];
+  const pick = encouragements[new Date().getMonth() % encouragements.length];
+  return forWA
+    ? `لم يحصل على مركز هذا الشهر\n${pick}`
+    : pick;
+}
+
 function countAttendance(md) {
   if (!md || !md.sessions) return 0;
   return Object.values(md.sessions).filter(v => v === true).length;
@@ -2767,7 +2431,7 @@ function registerAttendanceForStudent(studentId) {
   if (alreadyToday) {
     const s = students[studentId];
     toast(`${s?.name} — سُجِّل حضوره اليوم مسبقاً ✅`, 'warning');
-    playBeep(false);
+    playWarnSound();
     return;
   }
 
@@ -2859,7 +2523,7 @@ function startScanner() {
         if (decodedText === lastScannedCode && now - lastScannedTime < 2000) return;
         lastScannedCode = decodedText;
         lastScannedTime = now;
-        playBeep(true);
+        playScanSound();
         processScannedCode(decodedText);
       },
       function() {}
@@ -3158,9 +2822,7 @@ function sendMonthlyReport(studentId) {
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === studentId);
-  const rankTxt = rankIdx >= 0 && rankIdx < 3
-    ? `${['الأول','الثاني','الثالث'][rankIdx]} في ${s.grade}`
-    : 'لم يحصل على مركز من ضمن الـ 3 الأوائل، يجب أن يبذل جهداً أكبر ليصبح منهم الشهر القادم';
+  const rankTxt = getRankText(rankIdx, s.grade, true);
   const attendance = countAttendance(md);
   let scoreLines = '';
   let totalSum = 0;
@@ -3171,7 +2833,21 @@ function sendMonthlyReport(studentId) {
     scoreLines += `\n• اختبار ${i}: *${display}${maxLabel}*`;
     if (v!=null&&v!=='') totalSum += parseFloat(v)||0;
   }
-  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📊 *حصاد التقرير الشامل لشهر ${formatMonthLabel(currentMonth)}*  📊\n• الطالب: *${s.name}*\n• ترتيب الطالب في المرحلة: *${rankTxt}*\n----------------------------------------\n📈 *سجل درجات الاختبارات بالتفصيل*:${scoreLines}\n• المجموع الكلي: *${totalSum}*\n• إجمالي حضور الشهر: *${attendance} / 8 حصص*\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+
+  // حالة الدفع — فقط للبرايفيت وغير المعفيين
+  let payLine = '';
+  if (s.type === 'private') {
+    if (s.feeExempt) {
+      // معفي — لا نذكر المصاريف خالص
+      payLine = '';
+    } else if (md.paid) {
+      payLine = `\n💰 *حالة المصاريف:* ✅ تم الدفع بتاريخ ${md.payDate || ''}`;
+    } else {
+      payLine = `\n💰 *حالة المصاريف:* ❌ لم يتم تسديد مصاريف هذا الشهر`;
+    }
+  }
+
+  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📊 *حصاد التقرير الشامل لشهر ${formatMonthLabel(currentMonth)}*  📊\n• الطالب: *${s.name}*\n• ترتيب الطالب في المرحلة: *${rankTxt}*\n----------------------------------------\n📈 *سجل درجات الاختبارات بالتفصيل*:${scoreLines}\n• المجموع الكلي: *${totalSum}*\n• إجمالي حضور الشهر: *${attendance} / 8 حصص*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
   openWA(s.phone, msg);
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/monthly`).set(true);
   toast('تم فتح واتساب للتقرير الشهري','success');
@@ -3298,6 +2974,204 @@ function renderSchedules() {
 
 function printSchedules() {
   window.print();
+}
+
+// =============================================
+// إرسال الجدول لولي الأمر عبر واتساب
+// =============================================
+function buildScheduleMsg(studentName, grade, gradeSchedules, startDate) {
+  let msg = `📅 *جدول ${grade}*\n`;
+  msg += `🧪 منصة الأوربيتالي — أ. عمرو عبد الرازق\n`;
+  msg += `────────────────────\n`;
+  if (gradeSchedules.length) {
+    gradeSchedules.forEach(sc => {
+      if (sc.place) msg += `📍 *${sc.place}*\n`;
+      if (sc.day1) {
+        msg += `📆 ${sc.day1}`;
+        if (sc.time1from) msg += ` — ${formatTime12h(sc.time1from)}${sc.time1to?' إلى '+formatTime12h(sc.time1to):''}`;
+        msg += '\n';
+      }
+      if (sc.day2) {
+        msg += `📆 ${sc.day2}`;
+        if (sc.time2from) msg += ` — ${formatTime12h(sc.time2from)}${sc.time2to?' إلى '+formatTime12h(sc.time2to):''}`;
+        msg += '\n';
+      }
+      if (sc.note) msg += `📝 ${sc.note}\n`;
+      msg += '\n';
+    });
+  } else {
+    msg += 'لم يُضف جدول لهذه المرحلة بعد.\n';
+  }
+  // تاريخ البداية
+  if (startDate) {
+    msg += `────────────────────\n`;
+    msg += `🗓 *تاريخ بداية الدروس:* ${startDate}\n`;
+  }
+  msg += `────────────────────\n`;
+  if (studentName) msg += `👨‍🎓 الطالب: *${studentName}*\n`;
+  msg += `🪐 *منصة الأوربيتالي*`;
+  return msg;
+}
+
+function sendScheduleToParent(studentId) {
+  const s = students[studentId];
+  if (!s || s.phone === 'none') { toast('لا يوجد رقم واتساب لهذا الطالب','warning'); return; }
+
+  // موديال صغير لاختيار تاريخ البداية
+  const existing = document.getElementById('sendSchedSingleModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'sendSchedSingleModal';
+  modal.className = 'modal-backdrop open';
+  modal.innerHTML = `
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <span class="modal-title"><i class="fas fa-calendar-alt" style="color:var(--accent)"></i> إرسال الجدول</span>
+        <button class="modal-close" onclick="document.getElementById('sendSchedSingleModal').remove()"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="margin-bottom:12px;padding:10px 14px;background:rgba(79,142,247,0.08);border-radius:var(--radius-sm);border:1px solid rgba(79,142,247,0.2);font-size:0.9rem">
+        <i class="fas fa-user-graduate" style="color:var(--accent)"></i>
+        <strong>${s.name}</strong> — ${s.grade}
+      </div>
+      <div class="form-group">
+        <label><i class="fas fa-calendar-check" style="color:var(--success)"></i> تاريخ بداية الدروس (اختياري)</label>
+        <input type="date" class="form-control" id="schedSingleStartDate">
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">لو حددت تاريخ هيتبعت في الرسالة — لو متحددتش الرسالة هتبعت بدون تاريخ</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('sendSchedSingleModal').remove()">إلغاء</button>
+        <button class="btn btn-success" onclick="_confirmSendScheduleSingle('${studentId}')"><i class="fab fa-whatsapp"></i> إرسال</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function _confirmSendScheduleSingle(studentId) {
+  const s = students[studentId];
+  if (!s) return;
+  const rawDate = document.getElementById('schedSingleStartDate')?.value || '';
+  const startDate = rawDate ? _formatArabicDate(rawDate) : '';
+  const gradeSchedules = Object.values(schedules).filter(sch => sch.grade === s.grade);
+  const msg = buildScheduleMsg(s.name, s.grade, gradeSchedules, startDate);
+  const clean = s.phone.replace(/\D/g,'');
+  const intl = clean.startsWith('0') ? '2'+clean : clean;
+  window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
+  toast(`تم فتح واتساب لإرسال الجدول إلى ${s.name}`, 'success');
+  document.getElementById('sendSchedSingleModal')?.remove();
+}
+
+function openSendScheduleModal() {
+  const gradeOpts = GRADES.map(g => `<option value="${g}">${g}</option>`).join('');
+  const existing = document.getElementById('sendSchedModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'sendSchedModal';
+  modal.className = 'modal-backdrop open';
+  modal.innerHTML = `
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <span class="modal-title"><i class="fab fa-whatsapp" style="color:#25d366"></i> إرسال الجدول لأولياء الأمور</span>
+        <button class="modal-close" onclick="document.getElementById('sendSchedModal').remove()"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:0.82rem;color:var(--text-secondary);line-height:1.6">
+        <i class="fas fa-info-circle" style="color:var(--accent)"></i>
+        كل ولي أمر هيوصله جدول <strong>مرحلة ابنه بس</strong> — مش هيوصله جداول المراحل التانية.
+        <br>واتساب بيفتح نافذة لكل شخص بالتتالي — لا تغلق المتصفح أثناء الإرسال.
+      </div>
+
+      <div class="form-group">
+        <label>المرحلة الدراسية <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" id="sendSchedGrade" onchange="updateSendSchedPreview()">
+          <option value="">-- اختر المرحلة --</option>
+          ${gradeOpts}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label><i class="fas fa-calendar-check" style="color:var(--success)"></i> تاريخ بداية الدروس (اختياري)</label>
+        <input type="date" class="form-control" id="sendSchedStartDate">
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">لو حددت تاريخ هيتضاف في الرسالة لكل ولي أمر</div>
+      </div>
+
+      <div id="sendSchedPreview" style="padding:8px 12px;border-radius:var(--radius-sm);font-size:0.85rem;display:none"></div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('sendSchedModal').remove()">إلغاء</button>
+        <button class="btn btn-success" onclick="doSendScheduleToAll()"><i class="fab fa-whatsapp"></i> إرسال</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function updateSendSchedPreview() {
+  const grade = document.getElementById('sendSchedGrade')?.value || '';
+  const el = document.getElementById('sendSchedPreview');
+  if (!grade) { el.style.display = 'none'; return; }
+  const parents = Object.values(students).filter(s =>
+    s.phone && s.phone !== 'none' && (s.status||'active') === 'active' && s.grade === grade
+  );
+  const seen = new Set();
+  const unique = parents.filter(s => { if(seen.has(s.phone)) return false; seen.add(s.phone); return true; });
+  const hasSchedule = Object.values(schedules).some(sc => sc.grade === grade);
+  el.style.display = 'block';
+  if (!hasSchedule) {
+    el.style.background = 'rgba(248,81,73,0.1)';
+    el.style.border = '1px solid rgba(248,81,73,0.3)';
+    el.style.color = 'var(--danger)';
+    el.innerHTML = `<i class="fas fa-exclamation-triangle"></i> لم يُضف جدول لمرحلة ${grade} بعد`;
+    return;
+  }
+  el.style.background = 'rgba(63,185,80,0.1)';
+  el.style.border = '1px solid rgba(63,185,80,0.3)';
+  el.style.color = 'var(--success)';
+  el.innerHTML = `<i class="fas fa-users"></i> سيتم إرسال جدول <strong>${grade}</strong> إلى <strong>${unique.length}</strong> ولي أمر`;
+}
+
+// دالة مساعدة لتحويل التاريخ لعربي
+function _formatArabicDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  } catch(e) { return dateStr; }
+}
+
+function doSendScheduleToAll() {
+  const grade = document.getElementById('sendSchedGrade')?.value || '';
+  if (!grade) { toast('اختر المرحلة الدراسية أولاً','error'); return; }
+
+  const rawDate = document.getElementById('sendSchedStartDate')?.value || '';
+  const startDate = rawDate ? _formatArabicDate(rawDate) : '';
+
+  // جدول هذه المرحلة فقط
+  const gradeSchedules = Object.values(schedules).filter(sch => sch.grade === grade);
+  if (!gradeSchedules.length) { toast(`لم يُضف جدول لمرحلة ${grade} بعد`,'warning'); return; }
+
+  // أولياء أمور هذه المرحلة فقط (بدون تكرار الرقم)
+  const parents = Object.values(students).filter(s =>
+    s.phone && s.phone !== 'none' && (s.status||'active') === 'active' && s.grade === grade
+  );
+  const seen = new Set();
+  const unique = parents.filter(s => { if(seen.has(s.phone)) return false; seen.add(s.phone); return true; });
+  if (!unique.length) { toast('لا يوجد أولياء أمور بأرقام مسجلة في هذه المرحلة','warning'); return; }
+
+  let delay = 0;
+  unique.forEach(s => {
+    setTimeout(() => {
+      // كل ولي أمر بياخد جدول مرحلة ابنه بس
+      const msg = buildScheduleMsg(s.name, grade, gradeSchedules, startDate);
+      const clean = s.phone.replace(/\D/g,'');
+      const intl = clean.startsWith('0') ? '2'+clean : clean;
+      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
+    }, delay);
+    delay += 700;
+  });
+  toast(`تم فتح ${unique.length} نافذة واتساب لمرحلة ${grade} 📲`, 'success');
+  document.getElementById('sendSchedModal')?.remove();
 }
 </script>
 
@@ -3539,19 +3413,95 @@ function buildParentStudentCard(id) {
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === id);
-  const rankTxt = rankIdx >= 0 && rankIdx < 3
-    ? `${['الأول 🥇','الثاني 🥈','الثالث 🥉'][rankIdx]} في ${s.grade}`
-    : 'لم يحصل على مركز من ضمن الـ 3 الأوائل، يجب أن يبذل جهداً أكبر ليصبح منهم الشهر القادم';
-  let scoresHtml = '';
+  const rankTxt = getRankText(rankIdx, s.grade, false);
+
+  // درجات — grid واضح بدل badges متلاصقة
+  let scoresHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
   for (let i = 1; i <= 8; i++) {
     const v = md.exams?.[`e${i}`];
-    scoresHtml += `<span class="badge badge-accent" style="margin:3px">ا${i}: ${v!=null&&v!==''?v:'—'}/10</span>`;
+    const hasVal = v != null && v !== '';
+    const color  = hasVal ? (parseFloat(v) >= 7 ? 'var(--success)' : parseFloat(v) >= 5 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-muted)';
+    scoresHtml += `
+      <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center">
+        <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">اختبار ${i}</div>
+        <div style="font-size:1.1rem;font-weight:800;color:${color}">${hasVal ? v : '—'}</div>
+        <div style="font-size:0.68rem;color:var(--text-muted)">/ 10</div>
+      </div>`;
   }
-  let sessHtml = '';
+  scoresHtml += '</div>';
+
+  // حضور — grid واضح
+  let sessHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
   for (let i = 1; i <= 8; i++) {
     const v = md.sessions?.[`s${i}`];
-    sessHtml += `<span class="badge ${v===true?'badge-success':v===false?'badge-danger':'badge-secondary'}" style="margin:3px">${v===true?'✅':v===false?'❌':'—'} ح${i}</span>`;
+    const bg    = v === true  ? 'var(--success-bg)' : v === false ? 'var(--danger-bg)' : 'var(--bg-card2)';
+    const color = v === true  ? 'var(--success)'    : v === false ? 'var(--danger)'    : 'var(--text-muted)';
+    const icon  = v === true  ? '✅' : v === false  ? '❌' : '—';
+    sessHtml += `
+      <div style="background:${bg};border:1px solid ${color === 'var(--text-muted)' ? 'var(--border)' : color};border-radius:8px;padding:8px 6px;text-align:center">
+        <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">حصة ${i}</div>
+        <div style="font-size:1.1rem">${icon}</div>
+      </div>`;
   }
+  sessHtml += '</div>';
+
+  // جدول المرحلة الخاص بالطالب — نفس شكل الجداول الداخلية
+  const gradeSchedules = Object.values(schedules).filter(sch => sch.grade === s.grade);
+  let scheduleSection = '';
+  if (gradeSchedules.length) {
+    const cards = gradeSchedules.map(sch => {
+      const day1Html = sch.day1
+        ? `<div class="schedule-day-row">
+            <i class="fas fa-calendar-day"></i>
+            <div><strong>${sch.day1}</strong>${sch.time1from
+              ? `<span style="color:var(--text-secondary);margin-right:6px">${formatTime12h(sch.time1from)}${sch.time1to?' — '+formatTime12h(sch.time1to):''}</span>`
+              : ''}</div>
+           </div>`
+        : '';
+      const day2Html = sch.day2
+        ? `<div class="schedule-day-row">
+            <i class="fas fa-calendar-day" style="color:var(--accent2)"></i>
+            <div><strong>${sch.day2}</strong>${sch.time2from
+              ? `<span style="color:var(--text-secondary);margin-right:6px">${formatTime12h(sch.time2from)}${sch.time2to?' — '+formatTime12h(sch.time2to):''}</span>`
+              : ''}</div>
+           </div>`
+        : '';
+      const placeHtml = sch.place
+        ? `<div style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:8px">
+            <i class="fas fa-map-marker-alt" style="color:var(--accent)"></i> ${sch.place}
+           </div>`
+        : '';
+      const noteHtml = sch.note
+        ? `<div style="margin-top:10px;font-size:0.82rem;color:var(--text-muted);background:var(--bg-card2);padding:8px 10px;border-radius:var(--radius-sm)">
+            <i class="fas fa-sticky-note" style="color:var(--warning)"></i> ${sch.note}
+           </div>`
+        : '';
+      return `<div class="schedule-card" style="border-top:3px solid var(--accent)">
+        <div class="grade-tag"><i class="fas fa-graduation-cap"></i> ${sch.grade}</div>
+        ${placeHtml}${day1Html}${day2Html}${noteHtml}
+      </div>`;
+    }).join('');
+    scheduleSection = `
+      <hr style="border-color:var(--border);margin:14px 0">
+      <div style="font-weight:700;margin-bottom:10px;color:var(--accent)">
+        <i class="fas fa-calendar-alt"></i> جدول ${s.grade}
+      </div>
+      <div class="schedule-grid" style="grid-template-columns:1fr">${cards}</div>`;
+  }
+
+  // لينك جروب الواتساب الخاص بمرحلة الطالب
+  let waGroupSection = '';
+  const waLinks = window._waGroupLinks || {};
+  const gradeLink = waLinks[s.grade] || '';
+  if (gradeLink) {
+    waGroupSection = `
+      <hr style="border-color:var(--border);margin:14px 0">
+      <a href="${gradeLink}" target="_blank" class="wa-join-btn">
+        <i class="fab fa-whatsapp" style="font-size:1.2rem"></i>
+        انضم لجروب واتساب ${s.grade}
+      </a>`;
+  }
+
   return `
     <div class="parent-card" style="margin-bottom:20px">
       <div class="parent-card-header">
@@ -3564,9 +3514,17 @@ function buildParentStudentCard(id) {
         <div class="info-row"><span class="info-label">الحضور</span><span class="info-val">${attendance}/8 حصص</span></div>
         <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore}/80</span></div>
         ${s.type==='private'?`<div class="info-row"><span class="info-label">الدفع</span><span class="info-val">${md.paid?`<span class="badge badge-success">مدفوع ${md.payDate||''}</span>`:'<span class="badge badge-danger">غير مدفوع</span>'}</span></div>`:''}
-        <div class="info-row"><span class="info-label">المركز</span><span class="info-val" style="font-size:0.85rem">${rankTxt}</span></div>
-        <div style="margin-top:14px"><div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:6px">الحضور التفصيلي:</div>${sessHtml}</div>
-        <div style="margin-top:10px"><div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:6px">الدرجات:</div>${scoresHtml}</div>
+        ${rankIdx >= 0 && rankIdx < 3
+          ? `<div style="margin:12px 0;padding:12px 14px;background:linear-gradient(135deg,rgba(240,192,64,0.15),rgba(240,192,64,0.05));border:1px solid rgba(240,192,64,0.4);border-radius:10px;text-align:center;font-weight:800;font-size:1rem;color:var(--gold)">${rankTxt}</div>`
+          : `<div style="margin:12px 0;padding:12px 14px;background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:10px;text-align:center;font-size:0.9rem;color:var(--text-secondary)">${rankTxt}</div>`
+        }
+        <hr style="border-color:var(--border);margin:10px 0">
+        <div style="color:var(--text-secondary);font-size:0.82rem;font-weight:600;margin-bottom:4px"><i class="fas fa-clipboard-check" style="color:var(--accent)"></i> الحضور التفصيلي</div>
+        ${sessHtml}
+        <div style="color:var(--text-secondary);font-size:0.82rem;font-weight:600;margin-top:14px;margin-bottom:4px"><i class="fas fa-star" style="color:var(--warning)"></i> الدرجات</div>
+        ${scoresHtml}
+        ${scheduleSection}
+        ${waGroupSection}
         <div style="margin-top:16px;text-align:center">
           <a href="https://wa.me/201112996672?text=${encodeURIComponent('السلام عليكم مستر عمرو، أنا ولي أمر '+s.name)}" target="_blank" class="btn btn-success" style="width:100%"><i class="fab fa-whatsapp"></i> تواصل مع المستر</a>
         </div>
@@ -3624,6 +3582,8 @@ function loadObserverAccountUI() {
     const st = document.getElementById('observerStatus');
     if (st && arr.length) { st.textContent = `${arr.length} حساب متابعة مسجّل`; st.style.color='var(--info)'; }
   });
+  // تحميل لينكات الجروبات في نفس الوقت
+  loadWAGroupLinks();
 }
 
 // =============================================
@@ -3890,6 +3850,53 @@ document.addEventListener('click', e => {
 });
 
 // =============================================
+// BACK BUTTON SUPPORT - معالج الـ popstate مُدمج مع showTab أعلاه
+// =============================================
+
+// =============================================
+// WHATSAPP GROUP LINKS
+// =============================================
+window._waGroupLinks = {};
+
+function loadWAGroupLinks() {
+  db.ref('settings/waGroupLinks').once('value', snap => {
+    window._waGroupLinks = snap.val() || {};
+    renderWAGroupLinksUI();
+  });
+}
+
+function renderWAGroupLinksUI() {
+  const container = document.getElementById('wa-group-links-list');
+  if (!container) return;
+  const links = window._waGroupLinks || {};
+  container.innerHTML = GRADES.map(grade => `
+    <div class="wa-group-link-row">
+      <label><span class="badge badge-accent" style="font-size:0.78rem">${grade}</span></label>
+      <input type="url" class="form-control" id="walink_${grade.replace(/\s+/g,'_')}"
+        placeholder="https://chat.whatsapp.com/xxxxx"
+        value="${links[grade] || ''}"
+        style="flex:1">
+    </div>
+  `).join('');
+}
+
+function saveWAGroupLinks() {
+  const links = {};
+  GRADES.forEach(grade => {
+    const el = document.getElementById('walink_' + grade.replace(/\s+/g,'_'));
+    if (el && el.value.trim()) links[grade] = el.value.trim();
+  });
+  db.ref('settings/waGroupLinks').set(links).then(() => {
+    window._waGroupLinks = links;
+    const st = document.getElementById('waGroupLinksStatus');
+    if (st) { st.textContent = '✅ تم حفظ لينكات الجروبات'; st.style.color = 'var(--success)'; }
+    toast('تم حفظ لينكات الجروبات بنجاح', 'success');
+  }).catch(() => {
+    toast('خطأ في حفظ اللينكات', 'error');
+  });
+}
+
+// =============================================
 // KEYBOARD SHORTCUTS
 // =============================================
 document.addEventListener('keydown', e => {
@@ -3938,22 +3945,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
-
-<!-- PRINT STYLES FOR SCHEDULES -->
-<style>
-@media print {
-  #splash, #loginScreen, .topbar, .sidebar, .page-header .btn,
-  .filter-bar, .modal-backdrop, .toast-container { display: none !important; }
-  #tab-schedules { display: block !important; }
-  .tab-page:not(#tab-schedules) { display: none !important; }
-  .main-content { margin: 0 !important; padding: 16px !important; }
-  body { background: #fff !important; color: #000 !important; }
-  .schedule-card { background: #fff !important; border: 1px solid #ccc !important; color: #000 !important; }
-  .grade-tag { color: #0066cc !important; background: #e6f0ff !important; }
-  .sched-actions { display: none !important; }
-  .schedule-day-row i { color: #0066cc !important; }
-}
-</style>
 
 <!-- Service Worker Registration (Offline Support) -->
 <script>
