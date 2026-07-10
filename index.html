@@ -2268,7 +2268,7 @@ function openStudentDetail(id) {
 // دالة مساعدة — كلمات الطالب/الطالبة حسب النوع
 // =============================================
 function studentLabel(s) {
-  const f = s.gender === 'female';
+  const f = s && s.gender === 'female';
   return {
     student  : f ? 'الطالبة'  : 'الطالب',
     child    : f ? 'ابنتك'    : 'ابنك',
@@ -2287,10 +2287,11 @@ function studentLabel(s) {
 
 // نص الترتيب — تشجيعي وبإيموجي واضح
 function getRankText(rankIdx, grade, forWA, s) {
-  const lbl = s ? studentLabel(s) : { rank1:'الأول', rank2:'الثاني', rank3:'الثالث' };
+  const lbl = studentLabel(s);  // دايماً يرجع object حتى لو s فاضي
   if (rankIdx === 0) return `🥇 ${lbl.rank1} في ${grade}`;
   if (rankIdx === 1) return `🥈 ${lbl.rank2} في ${grade}`;
   if (rankIdx === 2) return `🥉 ${lbl.rank3} في ${grade}`;
+  // خارج الـ 3 الأوائل أو غير محدد
   const encouragements = [
     '💪 بيتحسن باستمرار — الترتيب الأعلى قريب!',
     '🌟 كل شهر أحسن من اللي قبله — واصل!',
@@ -3024,11 +3025,6 @@ function saveSchedule() {
 function deleteSchedule(id) {
   if (!confirm('حذف هذا الجدول؟')) return;
   db.ref(`schedules/${id}`).remove().then(() => toast('تم الحذف','success'));
-}
-
-// دالة مساعدة: اسم الطالب/الطالبة حسب الجنس
-function studentLabel(s) {
-  return (s.gender === 'female') ? 'الطالبة' : 'الطالب';
 }
 
 // Convert "HH:MM" 24h to 12h AM/PM Arabic
