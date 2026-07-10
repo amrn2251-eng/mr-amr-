@@ -515,10 +515,10 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>الجنس</label>
+        <label>النوع</label>
         <select id="sGender" class="form-control">
-          <option value="male">ذكر — الطالب</option>
-          <option value="female">أنثى — الطالبة</option>
+          <option value="male">ذكر — طالب</option>
+          <option value="female">أنثى — طالبة</option>
         </select>
       </div>
     </div>
@@ -2211,7 +2211,7 @@ function openStudentDetail(id) {
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === id);
-  const rankTxt = getRankText(rankIdx, s.grade, false);
+  const rankTxt = getRankText(rankIdx, s.grade, false, s);
   let sessHtml = '';
   for (let i = 1; i <= 8; i++) {
     const v = md.sessions?.[`s${i}`];
@@ -2264,12 +2264,33 @@ function openStudentDetail(id) {
 // HELPERS
 // =============================================
 
+// =============================================
+// دالة مساعدة — كلمات الطالب/الطالبة حسب النوع
+// =============================================
+function studentLabel(s) {
+  const f = s.gender === 'female';
+  return {
+    student  : f ? 'الطالبة'  : 'الطالب',
+    child    : f ? 'ابنتك'    : 'ابنك',
+    him      : f ? 'لها'      : 'له',
+    his      : f ? 'خاصة بها' : 'خاص به',
+    present  : f ? 'حاضرة'    : 'حاضر',
+    joined   : f ? 'انضمام ابنتك' : 'انضمام ابنك',
+    congrats : f ? 'نهنئك بتسجيل ابنتك'  : 'نهنئك بانضمام ابنك',
+    photo    : f ? 'صورة حديثة للطالبة' : 'صورة حديثة للطالب',
+    carneh   : f ? 'كارنيه الطالبة' : 'كارنيه الطالب',
+    rank1    : f ? 'الأولى'   : 'الأول',
+    rank2    : f ? 'الثانية'  : 'الثاني',
+    rank3    : f ? 'الثالثة'  : 'الثالث',
+  };
+}
+
 // نص الترتيب — تشجيعي وبإيموجي واضح
-function getRankText(rankIdx, grade, forWA) {
-  if (rankIdx === 0) return forWA ? `🥇 الأول في ${grade}` : `🥇 الأول في ${grade}`;
-  if (rankIdx === 1) return forWA ? `🥈 الثاني في ${grade}` : `🥈 الثاني في ${grade}`;
-  if (rankIdx === 2) return forWA ? `🥉 الثالث في ${grade}` : `🥉 الثالث في ${grade}`;
-  // خارج الـ 3 الأوائل — رسائل تشجيعية بناءة
+function getRankText(rankIdx, grade, forWA, s) {
+  const lbl = s ? studentLabel(s) : { rank1:'الأول', rank2:'الثاني', rank3:'الثالث' };
+  if (rankIdx === 0) return `🥇 ${lbl.rank1} في ${grade}`;
+  if (rankIdx === 1) return `🥈 ${lbl.rank2} في ${grade}`;
+  if (rankIdx === 2) return `🥉 ${lbl.rank3} في ${grade}`;
   const encouragements = [
     '💪 بيتحسن باستمرار — الترتيب الأعلى قريب!',
     '🌟 كل شهر أحسن من اللي قبله — واصل!',
@@ -2279,9 +2300,7 @@ function getRankText(rankIdx, grade, forWA) {
     '🌱 كل مجهود بيتحسب — واصل يا بطل!',
   ];
   const pick = encouragements[new Date().getMonth() % encouragements.length];
-  return forWA
-    ? `لم يحصل على مركز هذا الشهر\n${pick}`
-    : pick;
+  return forWA ? `لم يحصل على مركز هذا الشهر\n${pick}` : pick;
 }
 
 function countAttendance(md) {
@@ -2848,7 +2867,8 @@ function sendWelcomeWA(studentId) {
   const s = students[studentId];
   if (!s) return;
   const today = new Date().toLocaleDateString('ar-EG');
-  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\nالسلام عليكم ورحمة الله وبركاته،\nتحية طيبة وبعد..\n\nتم تسجيل الطالب: *${s.name}* بنجاح في منصة الأوربيتالي.\nنُبارك لحضرتك هذا التسجيل ونهنئك بانضمام ابنك إلى المنصة 🎉\n\n📚 *الصف الدراسي:* ${s.grade}\n📅 *تاريخ الالتحاق:* ${today}\n\nسيتم إخطار حضرتك بتقارير الحضور والدرجات بشكل منتظم إن شاء الله 📊\n\n📸 *تنبيه مهم:*\nمن فضلك أرسل صورة حديثة للطالب على هذا الرقم لاستخراج *كارنيه المنصة* الخاص بـ *${s.name}* 🪪\n\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
+  const lbl = studentLabel(s);
+  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\nالسلام عليكم ورحمة الله وبركاته،\nتحية طيبة وبعد..\n\nتم تسجيل ${lbl.student}: *${s.name}* بنجاح في منصة الأوربيتالي.\nنُبارك لحضرتك هذا التسجيل ونهنئك بـ${lbl.joined} إلى المنصة 🎉\n\n📚 *الصف الدراسي:* ${s.grade}\n📅 *تاريخ الالتحاق:* ${today}\n\nسيتم إخطار حضرتك بتقارير الحضور والدرجات بشكل منتظم إن شاء الله 📊\n\n📸 *تنبيه مهم:*\nمن فضلك أرسل ${lbl.photo} على هذا الرقم لاستخراج *${lbl.carneh}* الخاص بـ *${s.name}* 🪪\n\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
   openWA(s.phone, msg);
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/welcome`).set(true);
   toast('تم فتح واتساب لإرسال الترحيب','success');
@@ -2894,7 +2914,7 @@ function sendDailyReport(studentId) {
     db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/paymentSent`).set(true);
   }
 
-  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• الطالب: *${s.name}*\n• حالة الحضور: *حاضر ومتابع بالكامل ✅*\n• درجة اختبار حصة ${targetSession}: *${scoreText} / 10*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${studentLabel(s).student}: *${s.name}*\n• حالة الحضور: *${studentLabel(s).present} ومتابع بالكامل ✅*\n• درجة اختبار حصة ${targetSession}: *${scoreText} / 10*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
   openWA(s.phone, msg);
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/daily_s${targetSession}`).set(true);
   toast('تم فتح واتساب للتقرير اليومي','success');
@@ -2908,7 +2928,7 @@ function sendMonthlyReport(studentId) {
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === studentId);
-  const rankTxt = getRankText(rankIdx, s.grade, true);
+  const rankTxt = getRankText(rankIdx, s.grade, true, s);
   const attendance = countAttendance(md);
   let scoreLines = '';
   let totalSum = 0;
@@ -2933,7 +2953,7 @@ function sendMonthlyReport(studentId) {
     }
   }
 
-  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📊 *حصاد التقرير الشامل لشهر ${formatMonthLabel(currentMonth)}*  📊\n• الطالب: *${s.name}*\n• ترتيب الطالب في المرحلة: *${rankTxt}*\n----------------------------------------\n📈 *سجل درجات الاختبارات بالتفصيل*:${scoreLines}\n• المجموع الكلي: *${totalSum}*\n• إجمالي حضور الشهر: *${attendance} / 8 حصص*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📊 *حصاد التقرير الشامل لشهر ${formatMonthLabel(currentMonth)}*  📊\n• ${studentLabel(s).student}: *${s.name}*\n• ترتيب ${studentLabel(s).student} في المرحلة: *${rankTxt}*\n----------------------------------------\n📈 *سجل درجات الاختبارات بالتفصيل*:${scoreLines}\n• المجموع الكلي: *${totalSum}*\n• إجمالي حضور الشهر: *${attendance} / 8 حصص*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
   openWA(s.phone, msg);
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/monthly`).set(true);
   toast('تم فتح واتساب للتقرير الشهري','success');
@@ -3100,7 +3120,12 @@ function buildScheduleMsg(studentName, grade, gradeSchedules, startDate, student
     msg += `🗓 *تاريخ بداية الدروس:* ${startDate}\n`;
   }
   msg += `────────────────────\n`;
-  if (studentName) msg += `👨‍🎓 ${label}: *${studentName}*\n`;
+  msg += `⏰ *تنبيه:* يُرجى الحضور قبل الموعد بـ *ربع ساعة* للاختبار القبلي\n`;
+  msg += `────────────────────\n`;
+  if (studentName) {
+    const lbl = studentObj ? studentLabel(studentObj) : null;
+    msg += `� ${lbl ? lbl.student : 'الطالب'}: *${studentName}*\n`;
+  }
   msg += `🪐 *منصة الأوربيتالي*`;
   return msg;
 }
@@ -3509,7 +3534,7 @@ function buildParentStudentCard(id) {
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === id);
-  const rankTxt = getRankText(rankIdx, s.grade, false);
+  const rankTxt = getRankText(rankIdx, s.grade, false, s);
 
   // درجات — grid واضح بدل badges متلاصقة
   let scoresHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
@@ -3873,27 +3898,30 @@ function renderGroupList() {
 
   preview.innerHTML = linkNote + `
     <div class="table-wrap"><table>
-      <thead><tr><th>#</th><th>اسم الطالب</th><th>رقم ولي الأمر</th><th>إرسال فردي</th></tr></thead>
+      <thead><tr><th>#</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>إرسال فردي</th></tr></thead>
       <tbody>${unique.map((s, i) => `<tr>
         <td>${i+1}</td>
-        <td><strong>${s.name}</strong></td>
+        <td><strong>${s.name}</strong> <span style="font-size:0.75rem;color:var(--text-muted)">${s.gender==='female'?'👧':'👦'}</span></td>
         <td dir="ltr">${s.phone}</td>
         <td><button class="btn btn-xs" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)"
-          onclick="sendSingleGroupInvite('${s.phone}','${s.name}','${grade}')">
+          onclick="sendSingleGroupInvite('${s.phone}','${s.id}','${grade}')">
           <i class="fab fa-whatsapp"></i> إرسال
         </button></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
 }
 
-function buildGroupMsg(parentName, studentName, grade, link) {
-  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n────────────────────\nالسلام عليكم ورحمة الله وبركاته،\n\nنتشرف بدعوة حضرتكم للانضمام إلى جروب واتساب الخاص بـ *${grade}*\n\n👶 ولي أمر الطالب: *${studentName}*\n\nالجروب خاص بمتابعة:\n📚 الحضور والدرجات\n📊 التقارير الشهرية\n📢 الإعلانات والمواعيد الهامة\n${link ? `\n🔗 *رابط الانضمام للجروب:*\n${link}\n` : ''}\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
+function buildGroupMsg(studentObj, grade, link) {
+  const lbl = studentObj ? studentLabel(studentObj) : { child:'ابنك', student:'الطالب' };
+  const name = studentObj ? studentObj.name : '';
+  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n────────────────────\nالسلام عليكم ورحمة الله وبركاته،\n\nنتشرف بدعوة حضرتكم للانضمام إلى جروب واتساب الخاص بـ *${grade}*\n\n� ولي أمر ${lbl.student}: *${name}*\n\nالجروب خاص بمتابعة:\n📚 الحضور والدرجات\n📊 التقارير الشهرية\n📢 الإعلانات والمواعيد الهامة\n${link ? `\n🔗 *رابط الانضمام للجروب:*\n${link}\n` : ''}\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
   return msg;
 }
 
-function sendSingleGroupInvite(phone, studentName, grade) {
+function sendSingleGroupInvite(phone, studentId, grade) {
   const link = document.getElementById('groupLink').value.trim();
-  const msg = buildGroupMsg('', studentName, grade, link);
+  const s = students[studentId];
+  const msg = buildGroupMsg(s || null, grade, link);
   const clean = phone.replace(/\D/g, '');
   const intl = clean.startsWith('0') ? '2' + clean : clean;
   window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -3918,12 +3946,12 @@ function sendGroupInviteAll() {
   let delay = 0;
   unique.forEach((s, i) => {
     setTimeout(() => {
-      const msg = buildGroupMsg('', s.name, grade, link);
+      const msg = buildGroupMsg(s, grade, link);
       const clean = s.phone.replace(/\D/g, '');
       const intl = clean.startsWith('0') ? '2' + clean : clean;
       window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
     }, delay);
-    delay += 600; // فترة بين كل رسالة عشان المتصفح ميبلوكش
+    delay += 600;
   });
 
   toast(`تم فتح ${unique.length} رسالة واتساب 📲`, 'success');
