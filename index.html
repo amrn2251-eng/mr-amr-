@@ -303,6 +303,9 @@
         <button class="report-tab-btn" onclick="switchReportTab('welcome')" id="rpt-welcome">
           <i class="fas fa-handshake"></i> ترحيب معلق
         </button>
+        <button class="report-tab-btn" onclick="switchReportTab('schedule')" id="rpt-schedule">
+          <i class="fas fa-calendar-alt"></i> جداول لم تُرسل
+        </button>
       </div>
       <div id="reportContent"></div>
     </div>
@@ -507,6 +510,15 @@
         <select id="sType" class="form-control" onchange="toggleStudentTypeFields()">
           <option value="private">برايفيت</option>
           <option value="center">سنتر</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>الجنس</label>
+        <select id="sGender" class="form-control">
+          <option value="male">ذكر — الطالب</option>
+          <option value="female">أنثى — الطالبة</option>
         </select>
       </div>
     </div>
@@ -1820,56 +1832,94 @@ document.addEventListener('click', e => {
 // =============================================
 // BEEP SOUND — أصوات متنوعة حسب نوع الإجراء
 // =============================================
+
+// صوت عام نجاح/خطأ
 function playBeep(success=true) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const gain = ctx.createGain();
     gain.connect(ctx.destination);
-
     if (success) {
-      // نغمة نجاح — double beep تصاعدي
       [0, 0.12].forEach((t, i) => {
         const o = ctx.createOscillator();
-        o.connect(gain);
-        o.type = 'sine';
+        o.connect(gain); o.type = 'sine';
         o.frequency.value = i === 0 ? 880 : 1100;
         gain.gain.setValueAtTime(0, ctx.currentTime + t);
-        gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + t + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.12);
-        o.start(ctx.currentTime + t);
-        o.stop(ctx.currentTime + t + 0.12);
+        gain.gain.linearRampToValueAtTime(0.28, ctx.currentTime + t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.11);
+        o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.11);
       });
     } else {
-      // نغمة خطأ — نغمة هابطة واحدة
       const o = ctx.createOscillator();
-      o.connect(gain);
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(400, ctx.currentTime);
-      o.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.35);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      o.connect(gain); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(380, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.22, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-      o.start(ctx.currentTime);
-      o.stop(ctx.currentTime + 0.35);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.35);
     }
   } catch(e) {}
 }
 
-// نغمة دفع (cash register)
-function playPaySound() {
+// صفارة كاشير للحضور — beep حاد ثم طويل
+function playAttendanceSound(present) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const gain = ctx.createGain();
     gain.connect(ctx.destination);
-    [0, 0.1, 0.2].forEach((t, i) => {
+    if (present) {
+      // بيب قصير + بيب أطول (cashier style)
+      const freqs = [1800, 1400];
+      const times = [0, 0.09];
+      const durs  = [0.07, 0.14];
+      freqs.forEach((f, i) => {
+        const o = ctx.createOscillator();
+        o.connect(gain); o.type = 'square';
+        o.frequency.value = f;
+        gain.gain.setValueAtTime(0,    ctx.currentTime + times[i]);
+        gain.gain.linearRampToValueAtTime(0.28, ctx.currentTime + times[i] + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + times[i] + durs[i]);
+        o.start(ctx.currentTime + times[i]);
+        o.stop(ctx.currentTime + times[i] + durs[i]);
+      });
+    } else {
+      // بيب منخفض للغياب
       const o = ctx.createOscillator();
-      o.connect(gain);
-      o.type = 'square';
-      o.frequency.value = [523, 659, 784][i]; // C5 E5 G5
-      gain.gain.setValueAtTime(0, ctx.currentTime + t);
-      gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + t + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.09);
-      o.start(ctx.currentTime + t);
-      o.stop(ctx.currentTime + t + 0.09);
+      o.connect(gain); o.type = 'square';
+      o.frequency.value = 400;
+      gain.gain.setValueAtTime(0.22, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.18);
+    }
+  } catch(e) {}
+}
+
+// نغمة دفع — عملة معدنية + رنين صندوق
+function playPaySound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // نغمة مرتفعة قصيرة (صوت عملة)
+    const coin = ctx.createOscillator();
+    const coinGain = ctx.createGain();
+    coin.connect(coinGain); coinGain.connect(ctx.destination);
+    coin.type = 'sine';
+    coin.frequency.setValueAtTime(2500, ctx.currentTime);
+    coin.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.15);
+    coinGain.gain.setValueAtTime(0, ctx.currentTime);
+    coinGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.005);
+    coinGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+    coin.start(ctx.currentTime); coin.stop(ctx.currentTime + 0.22);
+    // نغمة رنين خلفية (صندوق كاشير)
+    [0.05, 0.18].forEach((t, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'triangle';
+      o.frequency.value = i === 0 ? 900 : 700;
+      g.gain.setValueAtTime(0, ctx.currentTime + t);
+      g.gain.linearRampToValueAtTime(0.18, ctx.currentTime + t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.12);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.12);
     });
   } catch(e) {}
 }
@@ -1884,7 +1934,7 @@ function playWarnSound() {
     o.type = 'triangle';
     o.frequency.setValueAtTime(600, ctx.currentTime);
     o.frequency.setValueAtTime(400, ctx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.setValueAtTime(0.22, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.3);
   } catch(e) {}
@@ -1900,7 +1950,7 @@ function playScanSound() {
     o.type = 'sine';
     o.frequency.setValueAtTime(1200, ctx.currentTime);
     o.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.setValueAtTime(0.28, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
     o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.1);
   } catch(e) {}
@@ -1935,6 +1985,7 @@ function openAddStudent() {
   document.getElementById('sNoWA').checked = false;
   document.getElementById('sGrade').value = GRADES[0];
   document.getElementById('sType').value = 'private';
+  document.getElementById('sGender').value = 'male';
   document.getElementById('sCode').value = '';
   document.getElementById('sNotes').value = '';
   document.getElementById('sStatus').value = 'active';
@@ -1958,6 +2009,7 @@ function openEditStudent(id) {
   document.getElementById('sPhone').disabled = noWA;
   document.getElementById('sGrade').value = s.grade || GRADES[0];
   document.getElementById('sType').value = s.type || 'private';
+  document.getElementById('sGender').value = s.gender || 'male';
   document.getElementById('sCode').value = s.customCode || '';
   document.getElementById('sNotes').value = s.notes || '';
   document.getElementById('sStatus').value = s.status || 'active';
@@ -1983,6 +2035,7 @@ function saveStudent() {
   const phone     = noWA ? 'none' : document.getElementById('sPhone').value.trim();
   const grade     = document.getElementById('sGrade').value;
   const type      = document.getElementById('sType').value;
+  const gender    = document.getElementById('sGender').value || 'male';
   const code      = document.getElementById('sCode').value.trim();
   const notes     = document.getElementById('sNotes').value.trim();
   const status    = document.getElementById('sStatus').value;
@@ -2007,7 +2060,7 @@ function saveStudent() {
 
   const id = editId || db.ref('students').push().key;
   const data = {
-    id, name, phone, grade, type, customCode: code, notes, status,
+    id, name, phone, grade, type, gender, customCode: code, notes, status,
     joinDate: joinDate || new Date().toISOString().split('T')[0],
     createdAt: editId ? (students[editId]?.createdAt || Date.now()) : Date.now(),
     monthlyFee, feeExempt, centerName
@@ -2388,7 +2441,7 @@ function toggleSession(studentId, sessionNum) {
   else newVal = null;
   const ref = db.ref(`monthData/${currentMonth}/${studentId}/sessions/s${sessionNum}`);
   if (newVal === null) { ref.remove(); } else { ref.set(newVal); }
-  playBeep(newVal === true);
+  playAttendanceSound(newVal === true);
 }
 
 function saveExamScore(studentId, examNum, val) {
@@ -2709,7 +2762,40 @@ function renderReports() {
         }).join('')}</tbody>
       </table></div>
     </div>`;
-  } else {
+  } else if (currentReportTab === 'schedule') {
+    // جداول لم تُرسل
+    const pending = rows.filter(s => {
+      if (s.phone === 'none') return false;
+      const md = monthData[s.id] || {};
+      return !(md.reportsSent?.schedule);
+    });
+    if (!pending.length) {
+      container.innerHTML = `<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success)"></i><p>تم إرسال الجداول لجميع الطلاب 🎉</p></div>`;
+      return;
+    }
+    container.innerHTML = `<div class="card" style="padding:0">
+      <div class="card-header" style="padding:14px 18px">
+        <span class="card-title"><i class="fas fa-calendar-alt" style="color:var(--accent)"></i> جداول لم تُرسل</span>
+        <span class="badge badge-warning">${pending.length}</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>الاسم</th><th>الصف</th><th>النوع</th><th>الكود</th><th>إرسال الجدول</th></tr></thead>
+        <tbody>${pending.map(s => {
+          const hasSchedule = Object.values(schedules).some(sc => sc.grade === s.grade);
+          return `<tr>
+            <td><strong>${s.name}</strong></td>
+            <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
+            <td><span class="badge ${s.type==='private'?'badge-info':'badge-secondary'}">${s.type==='private'?'برايفيت':'سنتر'}</span></td>
+            <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px">${s.customCode||'-'}</code></td>
+            <td>${hasSchedule
+              ? `<button class="btn btn-sm" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)" onclick="sendScheduleToParent('${s.id}')"><i class="fas fa-calendar-alt"></i> إرسال الجدول</button>`
+              : `<span style="color:var(--text-muted);font-size:0.8rem"><i class="fas fa-exclamation-triangle"></i> لا يوجد جدول لـ${s.grade}</span>`
+            }</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  } else if (currentReportTab === 'welcome') {
     const pending = rows.filter(s => {
       if (s.phone === 'none') return false;
       const md = monthData[s.id] || {};
@@ -2920,6 +3006,11 @@ function deleteSchedule(id) {
   db.ref(`schedules/${id}`).remove().then(() => toast('تم الحذف','success'));
 }
 
+// دالة مساعدة: اسم الطالب/الطالبة حسب الجنس
+function studentLabel(s) {
+  return (s.gender === 'female') ? 'الطالبة' : 'الطالب';
+}
+
 // Convert "HH:MM" 24h to 12h AM/PM Arabic
 function formatTime12h(t) {
   if (!t) return '';
@@ -2979,7 +3070,8 @@ function printSchedules() {
 // =============================================
 // إرسال الجدول لولي الأمر عبر واتساب
 // =============================================
-function buildScheduleMsg(studentName, grade, gradeSchedules, startDate) {
+function buildScheduleMsg(studentName, grade, gradeSchedules, startDate, studentObj) {
+  const label = studentObj ? studentLabel(studentObj) : 'الطالب';
   let msg = `📅 *جدول ${grade}*\n`;
   msg += `🧪 منصة الأوربيتالي — أ. عمرو عبد الرازق\n`;
   msg += `────────────────────\n`;
@@ -3008,7 +3100,7 @@ function buildScheduleMsg(studentName, grade, gradeSchedules, startDate) {
     msg += `🗓 *تاريخ بداية الدروس:* ${startDate}\n`;
   }
   msg += `────────────────────\n`;
-  if (studentName) msg += `👨‍🎓 الطالب: *${studentName}*\n`;
+  if (studentName) msg += `👨‍🎓 ${label}: *${studentName}*\n`;
   msg += `🪐 *منصة الأوربيتالي*`;
   return msg;
 }
@@ -3052,10 +3144,12 @@ function _confirmSendScheduleSingle(studentId) {
   const rawDate = document.getElementById('schedSingleStartDate')?.value || '';
   const startDate = rawDate ? _formatArabicDate(rawDate) : '';
   const gradeSchedules = Object.values(schedules).filter(sch => sch.grade === s.grade);
-  const msg = buildScheduleMsg(s.name, s.grade, gradeSchedules, startDate);
+  const msg = buildScheduleMsg(s.name, s.grade, gradeSchedules, startDate, s);
   const clean = s.phone.replace(/\D/g,'');
   const intl = clean.startsWith('0') ? '2'+clean : clean;
   window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
+  // تسجيل إن الجدول اتبعت
+  db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/schedule`).set(true);
   toast(`تم فتح واتساب لإرسال الجدول إلى ${s.name}`, 'success');
   document.getElementById('sendSchedSingleModal')?.remove();
 }
@@ -3163,10 +3257,12 @@ function doSendScheduleToAll() {
   unique.forEach(s => {
     setTimeout(() => {
       // كل ولي أمر بياخد جدول مرحلة ابنه بس
-      const msg = buildScheduleMsg(s.name, grade, gradeSchedules, startDate);
+      const msg = buildScheduleMsg(s.name, grade, gradeSchedules, startDate, s);
       const clean = s.phone.replace(/\D/g,'');
       const intl = clean.startsWith('0') ? '2'+clean : clean;
       window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank');
+      // تسجيل إرسال الجدول
+      db.ref(`monthData/${currentMonth}/${s.id}/reportsSent/schedule`).set(true);
     }, delay);
     delay += 700;
   });
