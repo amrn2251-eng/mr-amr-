@@ -160,8 +160,9 @@
           <label>النوع</label>
           <select class="form-control" id="studTypeFilter" onchange="renderStudentsTable()">
             <option value="">الكل</option>
-            <option value="private">برايفيت</option>
-            <option value="center">سنتر</option>
+            <option value="private">🏠 برايفيت</option>
+            <option value="home">🚗 برايفيت منزل</option>
+            <option value="center">🏫 سنتر</option>
           </select>
         </div>
         <div class="form-group">
@@ -358,7 +359,33 @@
           <button class="btn btn-secondary" onclick="lockSafe()"><i class="fas fa-lock"></i> قفل الخزنة</button>
         </div>
         <div class="stats-grid" id="safeStats"></div>
-        <!-- Unpaid students list -->
+
+        <!-- Daily Reconciliation -->
+        <div class="card" style="margin-bottom:16px;border-color:rgba(240,192,64,0.35)">
+          <div class="card-header">
+            <span class="card-title"><i class="fas fa-scale-balanced" style="color:var(--gold)"></i> مطابقة إيرادات اليوم</span>
+            <span id="reconcile-date" style="font-size:0.8rem;color:var(--text-muted)"></span>
+          </div>
+          <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:14px">
+            أدخل الفلوس الموجودة في إيدك النهارده — النظام هيقارنها بالمدفوعات المسجلة ويوضح لك الفرق.
+          </p>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px">
+              <label style="font-size:0.85rem">المبلغ الفعلي في إيدك (جنيه)</label>
+              <input type="number" id="actualCash" class="form-control" placeholder="0" min="0"
+                oninput="calcReconcile()">
+            </div>
+            <div class="form-group" style="margin-bottom:0;min-width:140px">
+              <label style="font-size:0.85rem">تاريخ المطابقة</label>
+              <input type="date" id="reconcileDate" class="form-control" onchange="calcReconcile()">
+            </div>
+            <button class="btn btn-warning" onclick="calcReconcile()">
+              <i class="fas fa-calculator"></i> احسب
+            </button>
+          </div>
+          <div id="reconcileResult" style="display:none"></div>
+        </div>
+        <!-- /Daily Reconciliation -->
         <div class="card" style="margin-bottom:16px">
           <div class="card-header" style="padding:14px 18px">
             <span class="card-title"><i class="fas fa-exclamation-circle" style="color:var(--danger)"></i> الطلاب الذين لم يدفعوا — <span id="unpaid-month-label"></span></span>
@@ -506,10 +533,11 @@
         <select id="sGrade" class="form-control"></select>
       </div>
       <div class="form-group">
-        <label>النوع <span style="color:var(--danger)">*</span></label>
+        <label>نوع التسجيل <span style="color:var(--danger)">*</span></label>
         <select id="sType" class="form-control" onchange="toggleStudentTypeFields()">
-          <option value="private">برايفيت</option>
-          <option value="center">سنتر</option>
+          <option value="private">🏠 برايفيت</option>
+          <option value="home">🚗 برايفيت في المنزل</option>
+          <option value="center">🏫 سنتر</option>
         </select>
       </div>
     </div>
@@ -522,7 +550,7 @@
         </select>
       </div>
     </div>
-    <!-- حقول البرايفيت -->
+    <!-- حقول البرايفيت والمنزل (مشتركة — سعر الاشتراك) -->
     <div id="privateFields">
       <div class="form-row">
         <div class="form-group">
@@ -537,7 +565,7 @@
         </div>
       </div>
     </div>
-    <!-- حقول السنتر -->
+    <!-- حقول السنتر فقط -->
     <div id="centerFields" style="display:none">
       <div class="form-group">
         <label>اسم السنتر <span style="color:var(--danger)">*</span></label>
@@ -631,10 +659,17 @@
         <select id="schGrade" class="form-control"></select>
       </div>
       <div class="form-group">
-        <label>المكان / الفرع</label>
-        <input type="text" id="schPlace" class="form-control" placeholder="اسم المكان">
+        <label>نوع الجدول <span style="color:var(--danger)">*</span></label>
+        <select id="schType" class="form-control" onchange="toggleSchedTypeFields()">
+          <option value="center">🏫 سنتر</option>
+          <option value="private">🏠 برايفيت</option>
+          <option value="home">🚗 برايفيت في المنزل</option>
+        </select>
       </div>
     </div>
+    <div class="form-group">
+      <label>المكان / الفرع</label>
+      <input type="text" id="schPlace" class="form-control" placeholder="اسم المكان أو العنوان"></div>
     <div style="background:var(--bg-card2);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
       <div style="font-weight:600;margin-bottom:10px;color:var(--accent)">اليوم الأول</div>
       <div class="form-row">
@@ -1508,7 +1543,7 @@ function renderUnpaidList() {
   if (!listEl) return;
   if (labelEl) labelEl.textContent = formatMonthLabel(currentMonth);
   const unpaid = Object.values(students).filter(s =>
-    s.type === 'private' && !s.feeExempt && !(monthData[s.id] && monthData[s.id].paid)
+    isPrivateType(s.type) && !s.feeExempt && !(monthData[s.id] && monthData[s.id].paid)
   );
   if (countEl) countEl.textContent = unpaid.length;
   if (!unpaid.length) {
@@ -1973,8 +2008,9 @@ function _filterByAssistantType(rows) {
 
 function toggleStudentTypeFields() {
   const type = document.getElementById('sType').value;
-  document.getElementById('privateFields').style.display = type === 'private' ? 'block' : 'none';
-  document.getElementById('centerFields').style.display = type === 'center' ? 'block' : 'none';
+  // برايفيت وهوم كلاهما بيحتاجوا حقل السعر
+  document.getElementById('privateFields').style.display = (type === 'private' || type === 'home') ? 'block' : 'none';
+  document.getElementById('centerFields').style.display  = type === 'center' ? 'block' : 'none';
 }
 
 function openAddStudent() {
@@ -2040,8 +2076,8 @@ function saveStudent() {
   const notes     = document.getElementById('sNotes').value.trim();
   const status    = document.getElementById('sStatus').value;
   const joinDate  = document.getElementById('sJoinDate').value;
-  const monthlyFee= type === 'private' ? (parseFloat(document.getElementById('sMonthlyFee').value)||0) : 0;
-  const feeExempt = type === 'private' ? document.getElementById('sFeeExempt').checked : false;
+  const monthlyFee= (type === 'private' || type === 'home') ? (parseFloat(document.getElementById('sMonthlyFee').value)||0) : 0;
+  const feeExempt = (type === 'private' || type === 'home') ? document.getElementById('sFeeExempt').checked : false;
   let   centerName= type === 'center' ? document.getElementById('sCenterName').value.trim() : '';
   const editId    = document.getElementById('sEditId').value;
 
@@ -2101,7 +2137,7 @@ function confirmDeleteStudent() {
 
 function openPayModal(id) {
   const s = students[id];
-  if (!s || s.type !== 'private') return;
+  if (!s || !isPrivateType(s.type)) return;
   const md = monthData[id];
   if (md && md.paid) { toast('تم الدفع مسبقاً لهذا الشهر','warning'); return; }
   pendingPayId = id;
@@ -2113,9 +2149,30 @@ function openPayModal(id) {
 function confirmPay() {
   if (!pendingPayId) return;
   const id = pendingPayId;
+  const s = students[id];
   const today = new Date().toLocaleDateString('ar-EG');
   db.ref(`monthData/${currentMonth}/${id}`).update({ paid: true, payDate: today })
-    .then(() => { playPaySound(); toast('تم تسجيل الدفع بنجاح','success'); closeModal('payModal'); pendingPayId = null; })
+    .then(() => {
+      playPaySound();
+      toast('تم تسجيل الدفع بنجاح','success');
+      closeModal('payModal');
+      pendingPayId = null;
+      // ← إضافة إيراد تلقائي في الخزنة
+      if (s && isPrivateType(s.type) && !s.feeExempt && s.monthlyFee > 0) {
+        const incId = db.ref('centerIncomes').push().key;
+        const tl = typeLabel(s.type);
+        db.ref(`centerIncomes/${incId}`).set({
+          id: incId,
+          desc: `مصاريف ${s.name} — ${tl.text} — ${s.grade}`,
+          amount: s.monthlyFee,
+          month: currentMonth.split('_')[1],
+          year:  currentMonth.split('_')[0],
+          date:  today,
+          autoFromPay: true,
+          studentId: id
+        });
+      }
+    })
     .catch(e => toast('خطأ','error'));
 }
 
@@ -2167,7 +2224,7 @@ function renderStudentsTable() {
     const rank = ranks[s.grade]?.findIndex(r => r.id === s.id);
     const isLeft = (s.status||'active') === 'left';
     const rankTxt = rank !== undefined && rank >= 0 && rank < 3 ? ['🥇','🥈','🥉'][rank] : '-';
-    const payCell = s.type === 'private'
+    const payCell = isPrivateType(s.type)
       ? (s.feeExempt
         ? `<span class="badge badge-info"><i class="fas fa-gift"></i> معفي</span>`
         : (md.paid
@@ -2182,7 +2239,7 @@ function renderStudentsTable() {
       </td>
       <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
       <td><code style="background:var(--bg-card2);padding:2px 8px;border-radius:4px">${s.customCode||'-'}</code></td>
-      <td><span class="badge ${s.type==='private'?'badge-info':'badge-secondary'}">${s.type==='private'?'برايفيت':'سنتر'}</span></td>
+      <td><span class="badge ${typeLabel(s.type).badge}" style="font-size:0.75rem">${typeLabel(s.type).icon} ${typeLabel(s.type).text}</span></td>
       <td>${isLeft ? '<span class="badge badge-secondary">—</span>' : payCell}</td>
       <td><span class="${attendance>0?'badge badge-success':'badge badge-secondary'}">${attendance}/8</span></td>
       <td>${totalScore}/80</td>
@@ -2231,7 +2288,7 @@ function openStudentDetail(id) {
     </div>
     <div class="form-row" style="margin-top:8px">
       <div class="info-row"><span class="info-label">الصف</span><span class="info-val">${s.grade}</span></div>
-      <div class="info-row"><span class="info-label">النوع</span><span class="info-val">${s.type==='private'?'برايفيت':'سنتر'}</span></div>
+      <div class="info-row"><span class="info-label">نوع التسجيل</span><span class="info-val">${typeLabel(s.type).icon} ${typeLabel(s.type).text}</span></div>
     </div>
     <div class="form-row" style="margin-top:8px">
       <div class="info-row"><span class="info-label">الكود</span><span class="info-val"><code style="background:var(--bg-card2);padding:2px 8px;border-radius:4px">${s.customCode||'-'}</code></span></div>
@@ -2243,7 +2300,7 @@ function openStudentDetail(id) {
       <div class="info-row"><span class="info-label">الحضور</span><span class="info-val">${attendance}/8</span></div>
       <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore}/80</span></div>
     </div>
-    ${s.type==='private'?`<div class="info-row"><span class="info-label">الدفع</span><span class="info-val">${md.paid
+    ${isPrivateType(s.type)?`<div class="info-row"><span class="info-label">الدفع</span><span class="info-val">${md.paid
         ? `<span class="badge badge-success">مدفوع ${md.payDate||''}</span> <button class="btn btn-xs btn-danger" onclick="confirmUnpay('${s.id}');closeModal('studentDetailModal')"><i class="fas fa-undo"></i> إلغاء</button>`
         : `<span class="badge badge-danger">غير مدفوع</span> <button class="btn btn-xs btn-warning" onclick="openPayModal('${s.id}');closeModal('studentDetailModal')"><i class="fas fa-money-bill-wave"></i> تسجيل</button>`
       }</span></div>`:''}
@@ -2283,6 +2340,20 @@ function studentLabel(s) {
     rank2    : f ? 'الثانية'  : 'الثاني',
     rank3    : f ? 'الثالثة'  : 'الثالث',
   };
+}
+
+// =============================================
+// دالة مساعدة — هل النوع يُعتبر "برايفيت" (يدفع)
+// =============================================
+function isPrivateType(type) {
+  return type === 'private' || type === 'home';
+}
+
+// نص النوع للعرض
+function typeLabel(type) {
+  if (type === 'private') return { text:'برايفيت', icon:'🏠', badge:'badge-info' };
+  if (type === 'home')    return { text:'برايفيت منزل', icon:'🚗', badge:'badge-warning' };
+  return { text:'سنتر', icon:'🏫', badge:'badge-secondary' };
 }
 
 // نص الترتيب — تشجيعي وبإيموجي واضح
@@ -2805,7 +2876,7 @@ function renderReports() {
           return `<tr>
             <td><strong>${s.name}</strong></td>
             <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
-            <td><span class="badge ${s.type==='private'?'badge-info':'badge-secondary'}">${s.type==='private'?'برايفيت':'سنتر'}</span></td>
+            <td><span class="badge ${typeLabel(s.type).badge}" style="font-size:0.75rem">${typeLabel(s.type).icon} ${typeLabel(s.type).text}</span></td>
             <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px">${s.customCode||'-'}</code></td>
             <td>${hasSchedule
               ? `<button class="btn btn-sm" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)" onclick="sendScheduleToParent('${s.id}')"><i class="fas fa-calendar-alt"></i> إرسال الجدول</button>`
@@ -2836,7 +2907,7 @@ function renderReports() {
         <tbody>${pending.map(s => `<tr>
           <td><strong>${s.name}</strong></td>
           <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
-          <td><span class="badge ${s.type==='private'?'badge-info':'badge-secondary'}">${s.type==='private'?'برايفيت':'سنتر'}</span></td>
+          <td><span class="badge ${typeLabel(s.type).badge}" style="font-size:0.75rem">${typeLabel(s.type).icon} ${typeLabel(s.type).text}</span></td>
           <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')"><i class="fab fa-whatsapp"></i> ترحيب</button></td>
         </tr>`).join('')}</tbody>
       </table></div>
@@ -2909,7 +2980,7 @@ function sendDailyReport(studentId) {
 
   // حالة الدفع - تُرسل مرة واحدة فقط لو لم ترسل من قبل
   let payLine = '';
-  if (s.type === 'private' && md.paid && !rep.paymentSent) {
+  if (isPrivateType(s.type) && md.paid && !rep.paymentSent) {
     payLine = `\n• حالة الدفع: *تم تسجيل دفع المصاريف في يوم ${md.payDate||dateDisplay}* ✅`;
     // سجّل إن حالة الدفع اتبعتت
     db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/paymentSent`).set(true);
@@ -2943,7 +3014,7 @@ function sendMonthlyReport(studentId) {
 
   // حالة الدفع — فقط للبرايفيت وغير المعفيين
   let payLine = '';
-  if (s.type === 'private') {
+  if (isPrivateType(s.type)) {
     if (s.feeExempt) {
       // معفي — لا نذكر المصاريف خالص
       payLine = '';
@@ -2973,6 +3044,7 @@ function sendReport(studentId, type, silent) {
 function openAddSchedule() {
   document.getElementById('schedModalTitle').textContent = 'إضافة جدول';
   document.getElementById('schGrade').value = GRADES[0];
+  document.getElementById('schType').value = 'center';
   document.getElementById('schPlace').value = '';
   document.getElementById('schDay1').value = '';
   document.getElementById('schTime1from').value = '';
@@ -2990,6 +3062,7 @@ function openEditSchedule(id) {
   if (!sc) return;
   document.getElementById('schedModalTitle').textContent = 'تعديل الجدول';
   document.getElementById('schGrade').value = sc.grade || '';
+  document.getElementById('schType').value = sc.schedType || 'center';
   document.getElementById('schPlace').value = sc.place || '';
   document.getElementById('schDay1').value = sc.day1 || '';
   document.getElementById('schTime1from').value = sc.time1from || '';
@@ -3003,23 +3076,46 @@ function openEditSchedule(id) {
 }
 
 function saveSchedule() {
-  const grade = document.getElementById('schGrade').value;
-  const place = document.getElementById('schPlace').value.trim();
-  const day1 = document.getElementById('schDay1').value;
+  const grade     = document.getElementById('schGrade').value;
+  const schedType = document.getElementById('schType').value;
+  const place     = document.getElementById('schPlace').value.trim();
+  const day1      = document.getElementById('schDay1').value;
   const time1from = document.getElementById('schTime1from').value;
-  const time1to = document.getElementById('schTime1to').value;
-  const day2 = document.getElementById('schDay2').value;
+  const time1to   = document.getElementById('schTime1to').value;
+  const day2      = document.getElementById('schDay2').value;
   const time2from = document.getElementById('schTime2from').value;
-  const time2to = document.getElementById('schTime2to').value;
-  const note = document.getElementById('schNote').value.trim();
-  const editId = document.getElementById('schEditId').value;
+  const time2to   = document.getElementById('schTime2to').value;
+  const note      = document.getElementById('schNote').value.trim();
+  const editId    = document.getElementById('schEditId').value;
   if (!grade) { toast('اختر الصف','error'); return; }
-  const id = editId || db.ref('schedules').push().key;
-  const data = { id, grade, place, day1, time1from, time1to, day2, time2from, time2to, note };
+  const id      = editId || db.ref('schedules').push().key;
+  const isEdit  = !!editId;
+  const newVer  = isEdit ? ((schedules[editId]?.version || 0) + 1) : 1;
+  const data    = { id, grade, schedType, place, day1, time1from, time1to, day2, time2from, time2to, note, version: newVer };
   db.ref(`schedules/${id}`).set(data).then(() => {
-    toast('تم حفظ الجدول','success');
+    toast(isEdit ? 'تم تحديث الجدول — سيظهر في تقارير الجداول للإرسال' : 'تم حفظ الجدول','success');
     closeModal('scheduleModal');
+    // لو تعديل — امسح schedule sent لطلاب المرحلة عشان يظهروا في التقارير من تاني
+    if (isEdit) _invalidateScheduleSentForGrade(grade);
   }).catch(() => toast('خطأ في الحفظ','error'));
+}
+
+function toggleSchedTypeFields() {
+  // يمكن لاحقاً إضافة حقول خاصة بكل نوع
+}
+
+// لما الجدول يتغير — امسح علامة الإرسال لطلاب المرحلة
+// عشان يظهروا من تاني في "جداول لم تُرسل"
+function _invalidateScheduleSentForGrade(grade) {
+  Object.values(students).forEach(s => {
+    if (s.grade !== grade) return;
+    if (s.phone === 'none') return;
+    db.ref(`monthData/${currentMonth}/${s.id}/reportsSent/schedule`).remove();
+  });
+  // حدّث التقارير مباشرة لو التاب مفتوح
+  if (document.getElementById('tab-reports')?.classList.contains('active')) {
+    renderReports();
+  }
 }
 
 function deleteSchedule(id) {
@@ -3068,6 +3164,7 @@ function renderSchedules() {
           <button class="btn btn-xs btn-danger" onclick="deleteSchedule('${sc.id}')"><i class="fas fa-trash"></i></button>
         </div>
         <div class="grade-tag"><i class="fas fa-graduation-cap"></i> ${sc.grade}</div>
+        ${sc.schedType ? `<div style="font-size:0.78rem;margin-bottom:8px"><span class="badge ${typeLabel(sc.schedType).badge}">${typeLabel(sc.schedType).icon} ${typeLabel(sc.schedType).text}</span></div>` : ''}
         ${sc.place?`<div style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:8px"><i class="fas fa-map-marker-alt" style="color:var(--accent)"></i> ${sc.place}</div>`:''}
         ${sc.day1?`<div class="schedule-day-row"><i class="fas fa-calendar-day"></i><div><strong>${sc.day1}</strong>${sc.time1from?`<span style="color:var(--text-secondary);margin-right:6px">${formatTime12h(sc.time1from)}${sc.time1to?' — '+formatTime12h(sc.time1to):''}</span>`:''}</div></div>`:''}
         ${sc.day2?`<div class="schedule-day-row"><i class="fas fa-calendar-day" style="color:var(--accent2)"></i><div><strong>${sc.day2}</strong>${sc.time2from?`<span style="color:var(--text-secondary);margin-right:6px">${formatTime12h(sc.time2from)}${sc.time2to?' — '+formatTime12h(sc.time2to):''}</span>`:''}</div></div>`:''}
@@ -3304,30 +3401,36 @@ function renderStats() {
   const leftStudents   = Object.values(students).filter(s => s.status === 'left');
   const total    = activeStudents.length;
   const private_ = activeStudents.filter(s => s.type === 'private').length;
+  const home_    = activeStudents.filter(s => s.type === 'home').length;
   const center   = activeStudents.filter(s => s.type === 'center').length;
-  const paid     = activeStudents.filter(s => s.type === 'private' && monthData[s.id]?.paid).length;
+  const paid     = activeStudents.filter(s => isPrivateType(s.type) && monthData[s.id]?.paid).length;
+  const allPrivate = private_ + home_;
   let html = `<div class="stats-grid">
     <div class="stat-card stat-accent"><div class="stat-icon">👥</div><div class="stat-val">${total}</div><div class="stat-label">الطلاب النشطون</div></div>
     <div class="stat-card stat-info"><div class="stat-icon">🏠</div><div class="stat-val">${private_}</div><div class="stat-label">برايفيت</div></div>
+    <div class="stat-card" style="border-color:rgba(245,158,11,0.4)"><div class="stat-icon">🚗</div><div class="stat-val">${home_}</div><div class="stat-label">برايفيت منزل</div></div>
     <div class="stat-card stat-secondary"><div class="stat-icon">🏫</div><div class="stat-val">${center}</div><div class="stat-label">سنتر</div></div>
     <div class="stat-card stat-success"><div class="stat-icon">💰</div><div class="stat-val">${paid}</div><div class="stat-label">دفعوا هذا الشهر</div></div>
-    <div class="stat-card stat-danger"><div class="stat-icon">⏳</div><div class="stat-val">${private_ - paid}</div><div class="stat-label">لم يدفعوا بعد</div></div>
+    <div class="stat-card stat-danger"><div class="stat-icon">⏳</div><div class="stat-val">${allPrivate - paid}</div><div class="stat-label">لم يدفعوا بعد</div></div>
     ${leftStudents.length ? `<div class="stat-card"><div class="stat-icon">🚪</div><div class="stat-val">${leftStudents.length}</div><div class="stat-label">غادروا الأوربيتالي</div></div>` : ''}
   </div>`;
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
   GRADES.forEach(grade => {
     const gs = activeStudents.filter(s => s.grade === grade);
-    const gPrivate = gs.filter(s => s.type === 'private').length;
-    const gCenter  = gs.filter(s => s.type === 'center').length;
-    const gPaid    = gs.filter(s => s.type === 'private' && monthData[s.id]?.paid).length;
+    const gPrivate  = gs.filter(s => s.type === 'private').length;
+    const gHome     = gs.filter(s => s.type === 'home').length;
+    const gCenter   = gs.filter(s => s.type === 'center').length;
+    const gAllPriv  = gPrivate + gHome;
+    const gPaid     = gs.filter(s => isPrivateType(s.type) && monthData[s.id]?.paid).length;
     if (!gs.length) return;
     html += `<div class="card">
       <div class="card-header"><span class="card-title"><i class="fas fa-users" style="color:var(--accent)"></i> ${grade}</span><span class="badge badge-accent">${gs.length} طالب</span></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <span class="badge badge-info">برايفيت: ${gPrivate}</span>
-        <span class="badge badge-secondary">سنتر: ${gCenter}</span>
+        ${gPrivate ? `<span class="badge badge-info">🏠 برايفيت: ${gPrivate}</span>` : ''}
+        ${gHome    ? `<span class="badge badge-warning">🚗 منزل: ${gHome}</span>` : ''}
+        ${gCenter  ? `<span class="badge badge-secondary">🏫 سنتر: ${gCenter}</span>` : ''}
         <span class="badge badge-success">دفعوا: ${gPaid}</span>
-        ${gPrivate - gPaid > 0 ? `<span class="badge badge-danger">لم يدفعوا: ${gPrivate - gPaid}</span>` : ''}
+        ${gAllPriv - gPaid > 0 ? `<span class="badge badge-danger">لم يدفعوا: ${gAllPriv - gPaid}</span>` : ''}
       </div>
       ${gs.length ? `
       <div style="margin-top:12px">
@@ -3411,6 +3514,15 @@ function deleteIncome(id) {
 }
 
 function renderIncomes() {
+  // تحديث تاريخ حقل المطابقة تلقائياً لليوم الحالي
+  const rdEl = document.getElementById('reconcileDate');
+  if (rdEl && !rdEl.value) {
+    rdEl.value = new Date().toISOString().split('T')[0];
+  }
+  const rdLabel = document.getElementById('reconcile-date');
+  if (rdLabel) {
+    rdLabel.textContent = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  }
   const tbody = document.getElementById('incomeBody');
   const statsEl = document.getElementById('safeStats');
   if (!tbody || !statsEl) return;
@@ -3422,9 +3534,9 @@ function renderIncomes() {
   const curTotal = curList.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
   const allTotal = list.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
 
-  // حساب مبالغ البرايفيت من الطلاب اللي دفعوا هذا الشهر
+  // حساب مبالغ البرايفيت (private + home) من الطلاب اللي دفعوا هذا الشهر
   const privateRevenue = Object.values(students)
-    .filter(s => s.type === 'private' && monthData[s.id]?.paid && !s.feeExempt)
+    .filter(s => isPrivateType(s.type) && monthData[s.id]?.paid && !s.feeExempt)
     .reduce((sum, s) => sum + (parseFloat(s.monthlyFee)||0), 0);
 
   // إجمالي الإيرادات = الإيرادات اليدوية + البرايفيت
@@ -3451,6 +3563,88 @@ function renderIncomes() {
       <td><button class="btn btn-xs btn-danger" onclick="deleteIncome('${inc.id}')"><i class="fas fa-trash"></i></button></td>
     </tr>`
   ).join('');
+}
+
+// =============================================
+// DAILY RECONCILIATION — مطابقة إيرادات اليوم
+// =============================================
+function calcReconcile() {
+  const actual    = parseFloat(document.getElementById('actualCash')?.value) || 0;
+  const dateVal   = document.getElementById('reconcileDate')?.value || new Date().toISOString().split('T')[0];
+  const resultEl  = document.getElementById('reconcileResult');
+  if (!resultEl) return;
+
+  // تحويل التاريخ لصيغة ar-EG لمطابقة inc.date
+  const targetDate = new Date(dateVal).toLocaleDateString('ar-EG');
+
+  // إيرادات يدوية مسجلة لهذا اليوم
+  const manualList = Object.values(centerIncomes).filter(inc => inc.date === targetDate);
+  const manualTotal = manualList.reduce((s, i) => s + (parseFloat(i.amount)||0), 0);
+
+  // مدفوعات برايفيت مسجلة لهذا اليوم (من monthData)
+  let payTotal = 0;
+  const payItems = [];
+  Object.values(students).forEach(s => {
+    if (!isPrivateType(s.type) || s.feeExempt) return;
+    const md = monthData[s.id];
+    if (md?.paid && md.payDate === targetDate) {
+      payTotal += parseFloat(s.monthlyFee)||0;
+      payItems.push({ name: s.name, amount: parseFloat(s.monthlyFee)||0, type: typeLabel(s.type).text });
+    }
+  });
+
+  const systemTotal = manualTotal + payTotal;
+  const diff = actual - systemTotal;
+  const isMatch = Math.abs(diff) < 0.01;
+
+  // بناء التفاصيل
+  let details = '';
+  if (payItems.length) {
+    details += `<div style="margin-bottom:8px">
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px">💰 مدفوعات اشتراكات:</div>
+      ${payItems.map(p => `<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span>${p.name} <span style="color:var(--text-muted);font-size:0.75rem">(${p.type})</span></span>
+        <span style="color:var(--success);font-weight:600">${p.amount.toLocaleString('ar-EG')} ج</span>
+      </div>`).join('')}
+    </div>`;
+  }
+  if (manualList.length) {
+    details += `<div style="margin-bottom:8px">
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px">📋 إيرادات يدوية:</div>
+      ${manualList.map(i => `<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span>${i.desc}</span>
+        <span style="color:var(--success);font-weight:600">${parseFloat(i.amount).toLocaleString('ar-EG')} ج</span>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+      <div style="background:var(--bg-card2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">الموجود في إيدك</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--accent)">${actual.toLocaleString('ar-EG')} ج</div>
+      </div>
+      <div style="background:var(--bg-card2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">المسجّل في النظام</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--text-primary)">${systemTotal.toLocaleString('ar-EG')} ج</div>
+      </div>
+      <div style="background:${isMatch ? 'var(--success-bg)' : diff > 0 ? 'rgba(79,142,247,0.1)' : 'var(--danger-bg)'};border:1px solid ${isMatch ? 'var(--success)' : diff > 0 ? 'var(--accent)' : 'var(--danger)'};border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">الفرق</div>
+        <div style="font-size:1.4rem;font-weight:800;color:${isMatch ? 'var(--success)' : diff > 0 ? 'var(--accent)' : 'var(--danger)'}">
+          ${isMatch ? '✅ مطابق' : (diff > 0 ? '+' : '') + diff.toLocaleString('ar-EG') + ' ج'}
+        </div>
+      </div>
+    </div>
+    ${!isMatch ? `<div style="background:${diff > 0 ? 'rgba(79,142,247,0.08)' : 'var(--danger-bg)'};border:1px solid ${diff > 0 ? 'rgba(79,142,247,0.3)' : 'var(--danger)'};border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:0.85rem;color:${diff > 0 ? 'var(--accent)' : 'var(--danger)'}">
+      <i class="fas fa-${diff > 0 ? 'info-circle' : 'exclamation-triangle'}"></i>
+      ${diff > 0
+        ? `الفلوس الموجودة أكتر من المسجّل بـ ${diff.toLocaleString('ar-EG')} ج — ربما في إيراد لم يتسجل بعد`
+        : `الفلوس الموجودة أقل من المسجّل بـ ${Math.abs(diff).toLocaleString('ar-EG')} ج — يرجى المراجعة`
+      }
+    </div>` : ''}
+    ${details ? `<div style="background:var(--bg-card2);border-radius:var(--radius-sm);padding:12px">${details}</div>` : '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:12px">لا توجد مدفوعات مسجلة لهذا اليوم في النظام</div>'}
+  `;
 }
 
 function confirmClearServer() {
@@ -3595,6 +3789,7 @@ function buildParentStudentCard(id) {
         : '';
       return `<div class="schedule-card" style="border-top:3px solid var(--accent)">
         <div class="grade-tag"><i class="fas fa-graduation-cap"></i> ${sch.grade}</div>
+        ${sch.schedType ? `<div style="font-size:0.78rem;margin-bottom:6px"><span class="badge ${typeLabel(sch.schedType).badge}">${typeLabel(sch.schedType).icon} ${typeLabel(sch.schedType).text}</span></div>` : ''}
         ${placeHtml}${day1Html}${day2Html}${noteHtml}
       </div>`;
     }).join('');
@@ -3630,7 +3825,7 @@ function buildParentStudentCard(id) {
         <div style="font-size:0.85rem;color:var(--accent);font-weight:700;margin-bottom:10px">📅 ${formatMonthLabel(currentMonth)}</div>
         <div class="info-row"><span class="info-label">الحضور</span><span class="info-val">${attendance}/8 حصص</span></div>
         <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore}/80</span></div>
-        ${s.type==='private'?`<div class="info-row"><span class="info-label">الدفع</span><span class="info-val">${md.paid?`<span class="badge badge-success">مدفوع ${md.payDate||''}</span>`:'<span class="badge badge-danger">غير مدفوع</span>'}</span></div>`:''}
+        ${isPrivateType(s.type)?`<div class="info-row"><span class="info-label">الدفع</span><span class="info-val">${md.paid?`<span class="badge badge-success">مدفوع ${md.payDate||''}</span>`:'<span class="badge badge-danger">غير مدفوع</span>'}</span></div>`:''}
         ${rankIdx >= 0 && rankIdx < 3
           ? `<div style="margin:12px 0;padding:12px 14px;background:linear-gradient(135deg,rgba(240,192,64,0.15),rgba(240,192,64,0.05));border:1px solid rgba(240,192,64,0.4);border-radius:10px;text-align:center;font-weight:800;font-size:1rem;color:var(--gold)">${rankTxt}</div>`
           : `<div style="margin:12px 0;padding:12px 14px;background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:10px;text-align:center;font-size:0.9rem;color:var(--text-secondary)">${rankTxt}</div>`
