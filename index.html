@@ -37,6 +37,7 @@
     <div class="tab-switch">
       <button class="active" onclick="switchLoginTab('teacher')"><i class="fas fa-chalkboard-teacher"></i> المعلم</button>
       <button onclick="switchLoginTab('parent')"><i class="fas fa-user-friends"></i> ولي الأمر</button>
+      <button onclick="switchLoginTab('student')"><i class="fas fa-user-graduate"></i> الطالب</button>
     </div>
     <div id="teacherLoginForm">
       <div class="form-group">
@@ -75,8 +76,38 @@
       </div>
       <button class="btn btn-primary" style="width:100%" onclick="doParentLogin()"><i class="fas fa-sign-in-alt"></i> عرض بيانات ابني</button>
     </div>
+    <!-- Student Login -->
+    <div id="studentLoginForm" style="display:none">
+      <div style="background:rgba(124,92,252,0.08);border:1px solid rgba(124,92,252,0.25);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:0.82rem;color:var(--text-secondary)">
+        <i class="fas fa-info-circle" style="color:var(--accent2)"></i>
+        ادخل بكود الطالب الخاص بك للدخول على الامتحانات
+      </div>
+      <div class="form-group">
+        <label>كود الطالب</label>
+        <input type="text" id="studentCodeLogin" class="form-control" placeholder="أدخل الكود"
+          onkeydown="if(event.key==='Enter') doStudentLogin()">
+      </div>
+      <button class="btn btn-primary" style="width:100%;background:linear-gradient(135deg,var(--accent2),#6d28d9)" onclick="doStudentLogin()">
+        <i class="fas fa-sign-in-alt"></i> دخول للامتحانات
+      </button>
+    </div>
     <div class="login-err" id="loginErr"></div>
   </div>
+</div>
+
+<!-- STUDENT EXAM SCREEN (منفصل عن باقي التطبيق) -->
+<div id="studentExamScreen" style="display:none;min-height:100vh;background:var(--bg-primary);direction:rtl">
+  <!-- header -->
+  <div style="background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100">
+    <div style="font-weight:800;font-size:1rem;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">
+      🪐 منصة الأوربيتالي — الامتحانات
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span id="studentExamUser" style="color:var(--text-secondary);font-size:0.88rem"></span>
+      <button class="btn btn-secondary btn-sm" onclick="doStudentLogout()"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
+  </div>
+  <div id="studentExamContent" style="max-width:720px;margin:0 auto;padding:24px 16px"></div>
 </div>
 
 <!-- TOAST CONTAINER -->
@@ -134,6 +165,9 @@
     </div>
     <div class="nav-item" onclick="showTab('archive')" id="nav-archive">
       <i class="fas fa-box-archive"></i><span class="nav-label">الأرشيف</span>
+    </div>
+    <div class="nav-item" onclick="showTab('exams')" id="nav-exams">
+      <i class="fas fa-file-pen"></i><span class="nav-label">الامتحانات</span>
     </div>
   </div>
 
@@ -490,6 +524,17 @@
       <div id="archiveContent">
         <div class="empty-state"><i class="fas fa-box-archive"></i><p>اختر شهراً مؤرشفاً للعرض</p></div>
       </div>
+    </div>
+
+    <!-- EXAMS TAB -->
+    <div class="tab-page" id="tab-exams">
+      <div class="page-header">
+        <div class="page-title"><i class="fas fa-file-pen"></i> الامتحانات الإلكترونية</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="openAddExam()"><i class="fas fa-plus"></i> إضافة امتحان</button>
+        </div>
+      </div>
+      <div id="examsContent"></div>
     </div>
 
     <!-- PARENT PORTAL TAB -->
@@ -867,6 +912,16 @@
         <label>عدد النسخ المطبوعة</label>
         <input type="number" id="bkCopies" class="form-control" placeholder="0" min="0">
       </div>
+      <div class="form-group">
+        <label>عدد الطلاب اللي هياخدوا الكتاب
+          <span style="font-size:0.75rem;color:var(--text-muted);display:block;font-weight:normal">لتوزيع تكلفة PDF والغلاف عليهم</span>
+        </label>
+        <input type="number" id="bkStudents" class="form-control" placeholder="0" min="1"
+          oninput="previewBookCost()">
+      </div>
+    </div>
+    <div id="bkCostPreview" style="display:none;margin-bottom:10px;padding:10px 14px;background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:var(--radius-sm);font-size:0.83rem;color:var(--text-secondary)"></div>
+    <div class="form-row">
       <div class="form-group" style="display:flex;flex-direction:column;justify-content:flex-end">
         <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px">
           <input type="checkbox" id="bkHasCover" onchange="toggleCoverField()" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;">
@@ -884,6 +939,55 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('bookModal')">إلغاء</button>
       <button class="btn btn-primary" onclick="saveBook()"><i class="fas fa-save"></i> حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Exam Modal -->
+<div class="modal-backdrop" id="examModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="examModalTitle">إضافة امتحان</span>
+      <button class="modal-close" onclick="closeModal('examModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>عنوان الامتحان <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="exTitle" class="form-control" placeholder="مثال: امتحان الفصل الأول">
+      </div>
+      <div class="form-group">
+        <label>الصف الدراسي <span style="color:var(--danger)">*</span></label>
+        <select id="exGrade" class="form-control"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>مدة الامتحان (دقيقة)</label>
+        <input type="number" id="exDuration" class="form-control" placeholder="60" min="1" max="300">
+      </div>
+      <div class="form-group">
+        <label>حالة الامتحان</label>
+        <select id="exStatus" class="form-control">
+          <option value="draft">📝 مسودة (غير منشور)</option>
+          <option value="active">✅ منشور — الطلاب يقدروا يحلوه</option>
+          <option value="closed">🔒 مغلق</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>تعليمات الامتحان (اختياري)</label>
+      <textarea id="exInstructions" class="form-control" rows="2" placeholder="اكتب التعليمات هنا..."></textarea>
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-weight:700;color:var(--accent)"><i class="fas fa-list-ol"></i> الأسئلة</span>
+      <button class="btn btn-sm btn-secondary" onclick="addQuestionRow()"><i class="fas fa-plus"></i> إضافة سؤال</button>
+    </div>
+    <div id="questionsContainer"></div>
+    <input type="hidden" id="exEditId">
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('examModal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveExam()"><i class="fas fa-save"></i> حفظ الامتحان</button>
     </div>
   </div>
 </div>
@@ -1074,7 +1178,7 @@ function onMonthChange() {
 }
 
 function populateGradeSelects() {
-  const ids = ['studGradeFilter','attGradeFilter','sGrade','schGrade','barcodeGrade','rptGradeFilter'];
+  const ids = ['studGradeFilter','attGradeFilter','sGrade','schGrade','barcodeGrade','rptGradeFilter','exGrade'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1105,8 +1209,10 @@ function switchLoginTab(tab) {
   const btns = document.querySelectorAll('.tab-switch button');
   btns[0].classList.toggle('active', tab === 'teacher');
   btns[1].classList.toggle('active', tab === 'parent');
-  document.getElementById('teacherLoginForm').style.display = tab === 'teacher' ? 'block' : 'none';
-  document.getElementById('parentLoginForm').style.display = tab === 'parent' ? 'block' : 'none';
+  btns[2].classList.toggle('active', tab === 'student');
+  document.getElementById('teacherLoginForm').style.display  = tab === 'teacher'  ? 'block' : 'none';
+  document.getElementById('parentLoginForm').style.display   = tab === 'parent'   ? 'block' : 'none';
+  document.getElementById('studentLoginForm').style.display  = tab === 'student'  ? 'block' : 'none';
   document.getElementById('loginErr').style.display = 'none';
 }
 
@@ -1330,6 +1436,584 @@ function doLogout() {
   if (keyBtn) keyBtn.style.display = '';
   // أعد تعيين الـ history لتفادي الرجوع للتطبيق بعد الخروج
   history.replaceState({ appState: 'logged-out' }, '', window.location.pathname);
+}
+
+// =============================================
+// STUDENT LOGIN & EXAM SYSTEM
+// =============================================
+let currentStudentId = null;
+let examsData        = {};
+
+// login الطالب
+function doStudentLogin() {
+  const code = (document.getElementById('studentCodeLogin')?.value || '').trim();
+  const err  = document.getElementById('loginErr');
+  if (!code) { err.textContent = 'أدخل كود الطالب'; err.style.display = 'block'; return; }
+  db.ref('students').once('value', snap => {
+    const all = snap.val() || {};
+    const s   = Object.values(all).find(st => st.customCode === code);
+    if (!s) { err.textContent = 'الكود غير صحيح'; err.style.display = 'block'; return; }
+    currentStudentId = s.id;
+    err.style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('studentExamScreen').style.display = 'block';
+    document.getElementById('studentExamUser').textContent = `👨‍🎓 ${s.name} — ${s.grade}`;
+    loadStudentExams(s);
+  });
+}
+
+function doStudentLogout() {
+  currentStudentId = null;
+  document.getElementById('studentExamScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('studentCodeLogin').value = '';
+}
+
+// تحميل الامتحانات المتاحة للطالب
+function loadStudentExams(s) {
+  const container = document.getElementById('studentExamContent');
+  container.innerHTML = `<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>جاري التحميل...</p></div>`;
+  db.ref('exams').once('value', snap => {
+    const all = snap.val() || {};
+    const available = Object.values(all).filter(ex =>
+      ex.status === 'active' && ex.grade === s.grade
+    );
+    if (!available.length) {
+      container.innerHTML = `<div class="empty-state" style="margin-top:60px">
+        <i class="fas fa-clipboard" style="font-size:3rem;color:var(--text-muted)"></i>
+        <p style="margin-top:12px;font-size:1rem">لا توجد امتحانات متاحة حالياً</p>
+      </div>`;
+      return;
+    }
+    // اجلب نتائج الطالب
+    db.ref(`examResults/${s.id}`).once('value', rSnap => {
+      const results = rSnap.val() || {};
+      container.innerHTML = `
+        <h2 style="margin-bottom:20px;font-size:1.1rem;color:var(--accent)">
+          <i class="fas fa-file-pen"></i> الامتحانات المتاحة
+        </h2>
+        <div style="display:grid;gap:14px">
+          ${available.map(ex => {
+            const done = results[ex.id];
+            return `<div class="card" style="border-color:${done ? 'rgba(63,185,80,0.3)' : 'rgba(79,142,247,0.2)'}">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                <div style="flex:1">
+                  <div style="font-size:1rem;font-weight:800;margin-bottom:4px">${ex.title}</div>
+                  <div style="font-size:0.82rem;color:var(--text-secondary)">
+                    ${ex.grade}
+                    ${ex.duration ? ` · <i class="fas fa-clock"></i> ${ex.duration} دقيقة` : ''}
+                    · ${(ex.questions||[]).length} سؤال
+                  </div>
+                  ${ex.instructions ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px;background:var(--bg-card2);padding:6px 10px;border-radius:6px">${ex.instructions}</div>` : ''}
+                </div>
+                <div style="text-align:center;flex-shrink:0">
+                  ${done
+                    ? `<div class="badge badge-success" style="font-size:0.85rem;padding:6px 14px"><i class="fas fa-check"></i> أجبت</div>
+                       <div style="font-size:1.2rem;font-weight:800;color:var(--success);margin-top:4px">${done.score}/${done.total}</div>`
+                    : `<button class="btn btn-primary" onclick="startStudentExam('${ex.id}','${s.id}')">
+                         <i class="fas fa-play"></i> ابدأ الامتحان
+                       </button>`
+                  }
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    });
+  });
+}
+
+// بدء الامتحان
+function startStudentExam(examId, studentId) {
+  db.ref(`exams/${examId}`).once('value', snap => {
+    const ex = snap.val();
+    if (!ex) return;
+    const container = document.getElementById('studentExamContent');
+    let timeLeft = (ex.duration || 60) * 60;
+    let timerInterval = null;
+    const answers = {};
+
+    const questionsHtml = (ex.questions || []).map((q, qi) => {
+      const isMcq  = q.type !== 'essay';
+      const imgHtml = q.imageUrl
+        ? `<div style="margin-bottom:12px;text-align:center">
+             <img src="${q.imageUrl}" alt="صورة السؤال"
+               style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid var(--border);object-fit:contain;cursor:zoom-in"
+               onclick="this.style.maxHeight=this.style.maxHeight==='none'?'280px':'none'">
+             <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">اضغط على الصورة للتكبير</div>
+           </div>`
+        : '';
+      return `
+      <div class="card" style="margin-bottom:14px;border-color:rgba(79,142,247,0.15)" id="qcard_${qi}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="color:var(--accent);font-weight:800;font-size:0.95rem">${qi+1}.</span>
+          ${!isMcq ? '<span class="badge badge-warning" style="font-size:0.72rem">✏️ مقالي</span>' : ''}
+          <span style="font-size:0.95rem;font-weight:700;flex:1">${q.text}</span>
+        </div>
+        ${imgHtml}
+        ${isMcq
+          ? `<div style="display:grid;gap:8px">
+              ${(q.options || []).map((opt, oi) => `
+                <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:all 0.2s"
+                  id="opt_${qi}_${oi}" onclick="selectAnswer(${qi},${oi},${(q.options||[]).length})">
+                  <span style="width:24px;height:24px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0" id="optCircle_${qi}_${oi}">
+                    ${String.fromCharCode(65+oi)}
+                  </span>
+                  <span>${opt}</span>
+                </label>`).join('')}
+             </div>`
+          : `<textarea class="form-control" id="essay_${qi}" rows="4" placeholder="اكتب إجابتك هنا..." style="resize:vertical"></textarea>
+             <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px"><i class="fas fa-clock" style="color:var(--warning)"></i> هذا السؤال سيُصحَّح يدوياً</div>`
+        }
+      </div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:1.1rem;font-weight:800">${ex.title}</div>
+          <div style="font-size:0.82rem;color:var(--text-secondary)">${(ex.questions||[]).length} سؤال</div>
+        </div>
+        ${ex.duration ? `
+        <div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:10px;padding:8px 18px;text-align:center">
+          <div style="font-size:0.72rem;color:var(--text-muted)">الوقت المتبقي</div>
+          <div style="font-size:1.4rem;font-weight:800;color:var(--danger);font-variant-numeric:tabular-nums" id="examTimer">--:--</div>
+        </div>` : ''}
+      </div>
+      ${ex.instructions ? `<div style="background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:0.85rem;color:var(--text-secondary)">${ex.instructions}</div>` : ''}
+      <div id="examQuestionsArea">${questionsHtml}</div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:1rem" onclick="submitExam('${examId}','${studentId}')">
+        <i class="fas fa-paper-plane"></i> تسليم الامتحان
+      </button>`;
+
+    // attach answers object to window scope
+    window._currentExamAnswers = answers;
+    window._currentExamData    = ex;
+
+    // timer
+    if (ex.duration) {
+      const updateTimer = () => {
+        const m = Math.floor(timeLeft/60).toString().padStart(2,'0');
+        const s = (timeLeft%60).toString().padStart(2,'0');
+        const el = document.getElementById('examTimer');
+        if (el) el.textContent = `${m}:${s}`;
+        if (timeLeft <= 300 && el) el.style.color = 'var(--danger)';
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          submitExam(examId, studentId);
+        }
+        timeLeft--;
+      };
+      updateTimer();
+      timerInterval = setInterval(updateTimer, 1000);
+      window._examTimer = timerInterval;
+    }
+  });
+}
+
+function selectAnswer(qi, oi, total) {
+  if (!window._currentExamAnswers) return;
+  window._currentExamAnswers[qi] = oi;
+  // تحديث شكل الخيارات
+  for (let i = 0; i < total; i++) {
+    const lbl = document.getElementById(`opt_${qi}_${i}`);
+    const cir = document.getElementById(`optCircle_${qi}_${i}`);
+    if (!lbl || !cir) continue;
+    if (i === oi) {
+      lbl.style.background = 'rgba(79,142,247,0.15)';
+      lbl.style.borderColor = 'var(--accent)';
+      cir.style.background  = 'var(--accent)';
+      cir.style.borderColor = 'var(--accent)';
+      cir.style.color       = '#fff';
+    } else {
+      lbl.style.background  = '';
+      lbl.style.borderColor = 'var(--border)';
+      cir.style.background  = '';
+      cir.style.borderColor = 'var(--border)';
+      cir.style.color       = '';
+    }
+  }
+}
+
+function submitExam(examId, studentId) {
+  if (window._examTimer) clearInterval(window._examTimer);
+  const ex      = window._currentExamData;
+  const answers = window._currentExamAnswers || {};
+  const qs      = ex.questions || [];
+
+  let mcqScore = 0, mcqTotal = 0;
+  const detail = qs.map((q, qi) => {
+    if (q.type === 'essay') {
+      const essayText = document.getElementById(`essay_${qi}`)?.value.trim() || '';
+      return { type:'essay', essayText, pending: true };
+    }
+    // اختياري
+    mcqTotal++;
+    const chosen  = answers[qi] ?? -1;
+    const correct = parseInt(q.correct ?? -1);
+    const isRight = chosen === correct;
+    if (isRight) mcqScore++;
+    return { type:'mcq', chosen, correct, isRight };
+  });
+
+  const hasEssay = detail.some(d => d.type === 'essay');
+  const result = {
+    score: mcqScore, total: mcqTotal,
+    hasEssay, essayPending: hasEssay,
+    detail, submittedAt: Date.now()
+  };
+
+  db.ref(`examResults/${studentId}/${examId}`).set(result).then(() => {
+    playBeep(true);
+    const pct = mcqTotal ? Math.round(mcqScore/mcqTotal*100) : null;
+    const container = document.getElementById('studentExamContent');
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px 20px">
+        <div style="font-size:4rem;margin-bottom:16px">${pct===null?'📝':pct>=70?'🏆':pct>=50?'📝':'💪'}</div>
+        <div style="font-size:1.6rem;font-weight:900;margin-bottom:8px">تم التسليم!</div>
+        ${mcqTotal > 0 ? `
+          <div style="font-size:2.5rem;font-weight:900;color:${pct>=70?'var(--success)':pct>=50?'var(--warning)':'var(--danger)'}">
+            ${mcqScore} / ${mcqTotal}
+          </div>
+          <div style="font-size:1rem;color:var(--text-secondary);margin:8px 0">درجة الأسئلة الاختيارية: ${pct}%</div>` : ''}
+        ${hasEssay ? `<div style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);border-radius:10px;padding:12px 20px;margin:12px auto;max-width:400px;font-size:0.88rem;color:var(--warning)">
+          <i class="fas fa-clock"></i> الأسئلة المقالية في انتظار مراجعة المعلم — ستظهر درجتها لاحقاً
+        </div>` : ''}
+        <div style="margin:20px auto;max-width:480px;text-align:right">
+          ${detail.filter(d=>d.type==='mcq').map((d,i) => {
+            const orig = qs.filter(q=>q.type!=='essay')[i]; // MCQ questions only
+            // need actual qi
+            return '';
+          }).join('')}
+          ${qs.map((q,qi) => {
+            const d = detail[qi];
+            if (d.type === 'essay') return `
+              <div style="padding:10px;margin-bottom:6px;border-radius:8px;background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.3)">
+                <div style="font-size:0.85rem"><strong>${qi+1}. </strong>${q.text}</div>
+                <div style="font-size:0.8rem;color:var(--warning);margin-top:4px">⏳ في انتظار التصحيح</div>
+              </div>`;
+            return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:6px;border-radius:8px;background:${d.isRight?'var(--success-bg)':'var(--danger-bg)'};border:1px solid ${d.isRight?'var(--success)':'var(--danger)'}">
+              <span>${d.isRight?'✅':'❌'}</span>
+              <div style="flex:1;font-size:0.85rem">
+                <div><strong>${qi+1}. </strong>${q.text}</div>
+                ${!d.isRight ? `<div style="color:var(--success);font-size:0.8rem">الإجابة الصحيحة: ${(q.options||[])[d.correct]||'—'}</div>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <button class="btn btn-secondary" onclick="loadStudentExams({id:'${studentId}',grade:'${ex.grade}',name:''})">
+          <i class="fas fa-arrow-right"></i> العودة
+        </button>
+      </div>`;
+  }).catch(() => toast('خطأ في التسليم','error'));
+}
+
+// =============================================
+// EXAMS CRUD (للمعلم)
+// =============================================
+function loadExamsData() {
+  db.ref('exams').on('value', snap => {
+    examsData = snap.val() || {};
+    if (document.getElementById('tab-exams')?.classList.contains('active')) renderExams();
+  });
+}
+
+function renderExams() {
+  const container = document.getElementById('examsContent');
+  if (!container) return;
+  const list = Object.values(examsData);
+  if (!list.length) {
+    container.innerHTML = `<div class="empty-state"><i class="fas fa-file-pen"></i><p>لا توجد امتحانات — اضغط "إضافة امتحان"</p></div>`;
+    return;
+  }
+  const statusLabel = { draft:'📝 مسودة', active:'✅ منشور', closed:'🔒 مغلق' };
+  const statusBadge = { draft:'badge-secondary', active:'badge-success', closed:'badge-danger' };
+  container.innerHTML = `<div style="display:grid;gap:14px">
+    ${list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(ex => `
+      <div class="card" style="border-color:${ex.status==='active'?'rgba(63,185,80,0.3)':ex.status==='closed'?'rgba(248,81,73,0.2)':'rgba(79,142,247,0.12)'}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="flex:1">
+            <div style="font-size:1rem;font-weight:800;margin-bottom:6px">${ex.title}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <span class="badge badge-accent" style="font-size:0.78rem">${ex.grade}</span>
+              <span class="badge ${statusBadge[ex.status]||'badge-secondary'}">${statusLabel[ex.status]||ex.status}</span>
+              <span style="font-size:0.8rem;color:var(--text-muted)">${(ex.questions||[]).length} سؤال</span>
+              ${ex.duration ? `<span style="font-size:0.8rem;color:var(--text-muted)"><i class="fas fa-clock"></i> ${ex.duration} د</span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-xs btn-secondary" onclick="viewExamResults('${ex.id}')" title="النتائج"><i class="fas fa-chart-bar"></i></button>
+            <button class="btn btn-xs btn-secondary" onclick="openEditExam('${ex.id}')" title="تعديل"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-xs btn-danger" onclick="deleteExam('${ex.id}')" title="حذف"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function openAddExam() {
+  document.getElementById('examModalTitle').textContent = 'إضافة امتحان';
+  document.getElementById('exTitle').value = '';
+  document.getElementById('exGrade').value = GRADES[0];
+  document.getElementById('exDuration').value = '60';
+  document.getElementById('exStatus').value = 'draft';
+  document.getElementById('exInstructions').value = '';
+  document.getElementById('exEditId').value = '';
+  document.getElementById('questionsContainer').innerHTML = '';
+  addQuestionRow(); // سؤال أول تلقائياً
+  openModal('examModal');
+}
+
+function openEditExam(id) {
+  const ex = examsData[id];
+  if (!ex) return;
+  document.getElementById('examModalTitle').textContent = 'تعديل الامتحان';
+  document.getElementById('exTitle').value = ex.title || '';
+  document.getElementById('exGrade').value = ex.grade || GRADES[0];
+  document.getElementById('exDuration').value = ex.duration || 60;
+  document.getElementById('exStatus').value = ex.status || 'draft';
+  document.getElementById('exInstructions').value = ex.instructions || '';
+  document.getElementById('exEditId').value = id;
+  document.getElementById('questionsContainer').innerHTML = '';
+  (ex.questions || []).forEach(q => addQuestionRow(q));
+  openModal('examModal');
+}
+
+function addQuestionRow(q) {
+  q = q || { text:'', type:'mcq', options:['','','',''], correct:0, essayAnswer:'', imageUrl:'' };
+  const qType   = q.type || 'mcq';
+  const imgUrl  = q.imageUrl || '';
+  const container = document.getElementById('questionsContainer');
+  const idx = container.children.length;
+  const div = document.createElement('div');
+  div.className = 'q-row';
+  div.style.cssText = 'background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <span style="font-weight:700;color:var(--accent);font-size:0.9rem">سؤال ${idx+1}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select class="form-control q-type" style="width:auto;font-size:0.82rem;padding:4px 8px" onchange="toggleQTypeFields(this)">
+          <option value="mcq"   ${qType==='mcq'  ?'selected':''}>☑️ اختيار من متعدد</option>
+          <option value="essay" ${qType==='essay'?'selected':''}>✏️ مقالي</option>
+        </select>
+        <button class="btn btn-xs btn-danger" onclick="this.closest('.q-row').remove();renumberQuestions()"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>
+
+    <!-- نص السؤال -->
+    <div class="form-group" style="margin-bottom:10px">
+      <input type="text" class="form-control q-text" placeholder="نص السؤال *" value="${(q.text||'').replace(/"/g,'&quot;')}">
+    </div>
+
+    <!-- صورة السؤال -->
+    <div style="margin-bottom:12px;padding:10px;background:var(--bg-input);border-radius:var(--radius-sm);border:1px dashed var(--border)">
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px"><i class="fas fa-image" style="color:var(--accent)"></i> صورة للسؤال (اختياري)</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <!-- رفع من الجهاز -->
+        <label class="btn btn-xs btn-secondary" style="cursor:pointer;margin:0">
+          <i class="fas fa-upload"></i> رفع صورة
+          <input type="file" class="q-img-file" accept="image/*" style="display:none" onchange="previewQImage(this)">
+        </label>
+        <!-- أو رابط -->
+        <span style="font-size:0.78rem;color:var(--text-muted)">أو</span>
+        <input type="url" class="form-control q-img-url" placeholder="https://... رابط صورة"
+          style="flex:1;min-width:180px;font-size:0.82rem"
+          value="${imgUrl}"
+          oninput="previewQImageUrl(this)">
+        <button class="btn btn-xs btn-danger" onclick="clearQImage(this)" title="مسح الصورة" ${!imgUrl?'style="display:none"':''}>
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <!-- معاينة الصورة -->
+      <div class="q-img-preview" style="margin-top:8px;${imgUrl?'':'display:none'}">
+        <img src="${imgUrl}" alt="صورة السؤال"
+          style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--border);object-fit:contain"
+          onerror="this.style.display='none'">
+      </div>
+      <!-- hidden field للقيمة الفعلية -->
+      <input type="hidden" class="q-img-data" value="${imgUrl}">
+    </div>
+
+    <!-- اختيار من متعدد -->
+    <div class="q-mcq-area" style="display:${qType==='mcq'?'block':'none'}">
+      <div style="display:grid;gap:6px">
+        ${(q.options||['','','','']).map((opt,oi)=>`
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="radio" name="correct_${idx}" value="${oi}" ${parseInt(q.correct)===oi?'checked':''} style="accent-color:var(--success);width:16px;height:16px;flex-shrink:0" title="الإجابة الصحيحة">
+            <input type="text" class="form-control q-opt" placeholder="خيار ${String.fromCharCode(65+oi)}" value="${(opt||'').replace(/"/g,'&quot;')}" style="flex:1">
+          </div>`).join('')}
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px"><i class="fas fa-circle-check" style="color:var(--success)"></i> اختر الإجابة الصحيحة بالزر الدائري</div>
+    </div>
+
+    <!-- مقالي -->
+    <div class="q-essay-area" style="display:${qType==='essay'?'block':'none'}">
+      <div class="form-group" style="margin-bottom:0">
+        <label style="font-size:0.8rem;color:var(--text-muted)">نموذج الإجابة (اختياري — للمراجعة اليدوية)</label>
+        <textarea class="form-control q-essay-answer" rows="2" placeholder="اكتب نموذج الإجابة للرجوع إليه عند التصحيح...">${q.essayAnswer||''}</textarea>
+      </div>
+      <div style="font-size:0.75rem;color:var(--warning);margin-top:6px"><i class="fas fa-exclamation-triangle"></i> الأسئلة المقالية تُصحَّح يدوياً</div>
+    </div>`;
+  container.appendChild(div);
+}
+
+// رفع صورة من الجهاز → base64
+function previewQImage(input) {
+  const row = input.closest('.q-row');
+  const file = input.files?.[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { toast('الصورة كبيرة جداً — الحد 2MB','warning'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = e.target.result;
+    _setQImage(row, data);
+  };
+  reader.readAsDataURL(file);
+}
+
+// معاينة من URL
+function previewQImageUrl(input) {
+  const row = input.closest('.q-row');
+  const url = input.value.trim();
+  _setQImage(row, url);
+}
+
+function _setQImage(row, src) {
+  const preview = row.querySelector('.q-img-preview');
+  const img     = preview.querySelector('img');
+  const hidden  = row.querySelector('.q-img-data');
+  const urlInp  = row.querySelector('.q-img-url');
+  const clearBtn= row.querySelector('button[title="مسح الصورة"]');
+  if (src) {
+    img.src = src;
+    img.style.display = '';
+    preview.style.display = 'block';
+    hidden.value = src;
+    if (urlInp && !src.startsWith('data:')) urlInp.value = src;
+    if (clearBtn) clearBtn.style.display = '';
+  } else {
+    img.src = '';
+    preview.style.display = 'none';
+    hidden.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+}
+
+function clearQImage(btn) {
+  const row = btn.closest('.q-row');
+  _setQImage(row, '');
+  const urlInp = row.querySelector('.q-img-url');
+  const fileInp = row.querySelector('.q-img-file');
+  if (urlInp) urlInp.value = '';
+  if (fileInp) fileInp.value = '';
+}
+
+function toggleQTypeFields(sel) {
+  const row = sel.closest('.q-row');
+  const isMcq = sel.value === 'mcq';
+  row.querySelector('.q-mcq-area').style.display  = isMcq ? 'block' : 'none';
+  row.querySelector('.q-essay-area').style.display = isMcq ? 'none'  : 'block';
+}
+
+function renumberQuestions() {
+  document.querySelectorAll('.q-row').forEach((row, i) => {
+    const span = row.querySelector('span');
+    if (span) span.textContent = `سؤال ${i+1}`;
+    row.querySelectorAll('input[type=radio]').forEach(r => r.name = `correct_${i}`);
+  });
+}
+
+function saveExam() {
+  const title    = document.getElementById('exTitle').value.trim();
+  const grade    = document.getElementById('exGrade').value;
+  const duration = parseInt(document.getElementById('exDuration').value)||60;
+  const status   = document.getElementById('exStatus').value;
+  const instr    = document.getElementById('exInstructions').value.trim();
+  const editId   = document.getElementById('exEditId').value;
+  if (!title) { toast('أدخل عنوان الامتحان','error'); return; }
+
+  const rows = document.querySelectorAll('.q-row');
+  if (!rows.length) { toast('أضف سؤالاً واحداً على الأقل','error'); return; }
+
+  const questions = [];
+  let valid = true;
+  rows.forEach((row, qi) => {
+    const text    = row.querySelector('.q-text')?.value.trim() || '';
+    const qType   = row.querySelector('.q-type')?.value || 'mcq';
+    const opts    = [...row.querySelectorAll('.q-opt')].map(i => i.value.trim());
+    const correct = parseInt(row.querySelector('input[type=radio]:checked')?.value ?? 0);
+    const essayAnswer = row.querySelector('.q-essay-answer')?.value.trim() || '';
+    const imageUrl    = row.querySelector('.q-img-data')?.value || '';
+    if (!text) { toast(`أدخل نص السؤال ${qi+1}`,'error'); valid=false; return; }
+    if (qType === 'mcq' && opts.some(o=>!o)) { toast(`أدخل جميع خيارات السؤال ${qi+1}`,'error'); valid=false; return; }
+    if (qType === 'mcq') questions.push({ text, type:'mcq', options: opts, correct, imageUrl });
+    else questions.push({ text, type:'essay', essayAnswer, imageUrl });
+  });
+  if (!valid) return;
+
+  const id   = editId || db.ref('exams').push().key;
+  const data = { id, title, grade, duration, status, instructions: instr, questions,
+                 createdAt: editId ? (examsData[editId]?.createdAt || Date.now()) : Date.now() };
+  db.ref(`exams/${id}`).set(data).then(() => {
+    toast('تم حفظ الامتحان','success');
+    closeModal('examModal');
+  }).catch(()=>toast('خطأ في الحفظ','error'));
+}
+
+function deleteExam(id) {
+  if (!confirm('حذف هذا الامتحان نهائياً؟')) return;
+  db.ref(`exams/${id}`).remove().then(()=>toast('تم الحذف','success'));
+}
+
+function viewExamResults(examId) {
+  const ex = examsData[examId];
+  if (!ex) return;
+  db.ref('examResults').once('value', snap => {
+    const all = snap.val() || {};
+    const results = [];
+    Object.entries(all).forEach(([sid, exs]) => {
+      if (exs[examId]) {
+        const s = students[sid];
+        results.push({ student: s, result: exs[examId] });
+      }
+    });
+    const existing = document.getElementById('examResultsModal');
+    if (existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'examResultsModal';
+    modal.className = 'modal-backdrop open';
+    modal.innerHTML = `
+      <div class="modal modal-lg">
+        <div class="modal-header">
+          <span class="modal-title"><i class="fas fa-chart-bar" style="color:var(--accent)"></i> نتائج: ${ex.title}</span>
+          <button class="modal-close" onclick="document.getElementById('examResultsModal').remove()"><i class="fas fa-times"></i></button>
+        </div>
+        ${!results.length
+          ? `<div class="empty-state"><i class="fas fa-inbox"></i><p>لم يؤدِ أحد هذا الامتحان بعد</p></div>`
+          : `<div class="table-wrap"><table>
+              <thead><tr><th>الطالب</th><th>الصف</th><th>الدرجة</th><th>النسبة</th><th>التاريخ</th></tr></thead>
+              <tbody>${results.sort((a,b)=>b.result.score-a.result.score).map((r,i)=>`<tr>
+                <td><strong>${r.student?.name||'—'}</strong></td>
+                <td><span class="badge badge-accent" style="font-size:0.75rem">${r.student?.grade||'—'}</span></td>
+                <td style="font-weight:700;color:var(--success)">${r.result.score}/${r.result.total}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="flex:1;background:var(--bg-card2);border-radius:4px;height:8px;overflow:hidden">
+                      <div style="height:100%;width:${Math.round(r.result.score/r.result.total*100)}%;background:${r.result.score/r.result.total>=0.7?'var(--success)':r.result.score/r.result.total>=0.5?'var(--warning)':'var(--danger)'}"></div>
+                    </div>
+                    <span style="font-size:0.82rem">${Math.round(r.result.score/r.result.total*100)}%</span>
+                  </div>
+                </td>
+                <td style="font-size:0.8rem;color:var(--text-muted)">${r.result.submittedAt ? new Date(r.result.submittedAt).toLocaleDateString('ar-EG') : '—'}</td>
+              </tr>`).join('')}</tbody>
+            </table></div>`
+        }
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="document.getElementById('examResultsModal').remove()">إغلاق</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  });
 }
 
 // =============================================
@@ -1686,8 +2370,8 @@ async function loadAllData() {
     loadIncomes(),
     loadBooks()
   ]);
-  // تحميل لينكات الجروبات (ضروري لبوابة ولي الأمر)
   loadWAGroupLinks();
+  loadExamsData();
 }
 
 function loadStudents() {
@@ -1771,6 +2455,7 @@ function showTab(tab) {
   if (tab === 'schedules') renderSchedules();
   if (tab === 'parent') renderParentPortal();
   if (tab === 'archive') { loadArchivedMonths(); }
+  if (tab === 'exams') renderExams();
   if (tab !== 'barcode' && scannerRunning) stopScanner();
   if (tab === 'barcode') { setTimeout(loadCameras, 300); }
 
@@ -2181,8 +2866,22 @@ function confirmUnpay(id) {
   if (!s) return;
   if (!confirm(`هل تريد إلغاء تسجيل دفع "${s.name}" لشهر ${formatMonthLabel(currentMonth)}؟\nهذا الإجراء قابل للتراجع.`)) return;
   db.ref(`monthData/${currentMonth}/${id}`).update({ paid: false, payDate: null })
-    .then(() => toast('تم إلغاء تسجيل الدفع','warning'))
+    .then(() => {
+      toast('تم إلغاء تسجيل الدفع','warning');
+      // ← مسح الإيراد التلقائي المرتبط بهذا الطالب في نفس الشهر
+      _removeAutoIncomeForStudent(id);
+    })
     .catch(() => toast('خطأ في الإلغاء','error'));
+}
+
+// مسح الإيراد التلقائي لطالب في الشهر الحالي
+function _removeAutoIncomeForStudent(studentId) {
+  const [cy, cm] = currentMonth.split('_');
+  Object.entries(centerIncomes).forEach(([incId, inc]) => {
+    if (inc.autoFromPay && inc.studentId === studentId && inc.year === cy && inc.month === cm) {
+      db.ref(`centerIncomes/${incId}`).remove();
+    }
+  });
 }
 </script>
 
@@ -3509,6 +4208,22 @@ function saveIncome() {
 }
 
 function deleteIncome(id) {
+  const inc = centerIncomes[id];
+  if (!inc) return;
+  // لو كان إيراد تلقائي من دفع طالب — اسأل هل تلغي الدفع كمان
+  if (inc.autoFromPay && inc.studentId) {
+    const s = students[inc.studentId];
+    const sName = s?.name || 'الطالب';
+    const choice = confirm(
+      `هذا إيراد تلقائي من دفع "${sName}".\n\nاضغط "موافق" لحذف الإيراد وإلغاء تسجيل الدفع معاً.\nاضغط "إلغاء" للرجوع بدون حذف.`
+    );
+    if (!choice) return;
+    // مسح الإيراد + إلغاء تسجيل الدفع
+    db.ref(`centerIncomes/${id}`).remove();
+    db.ref(`monthData/${currentMonth}/${inc.studentId}`).update({ paid: false, payDate: null })
+      .then(() => toast('تم حذف الإيراد وإلغاء تسجيل الدفع','warning'));
+    return;
+  }
   if (!confirm('حذف هذا الإيراد؟')) return;
   db.ref(`centerIncomes/${id}`).remove().then(() => toast('تم الحذف','success'));
 }
@@ -3552,15 +4267,18 @@ function renderIncomes() {
     tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fas fa-receipt"></i><p>لا توجد إيرادات</p></div></td></tr>`;
     return;
   }
-  list.sort((a,b) => b.date - a.date);
+  list.sort((a,b) => (b.date||'').localeCompare(a.date||''));
   tbody.innerHTML = list.map((inc, i) =>
-    `<tr>
+    `<tr style="${inc.autoFromPay ? 'background:rgba(63,185,80,0.04)' : ''}">
       <td>${i+1}</td>
-      <td>${inc.desc}</td>
+      <td>
+        ${inc.autoFromPay ? '<span class="badge badge-success" style="font-size:0.7rem;margin-left:4px"><i class="fas fa-bolt"></i> تلقائي</span>' : ''}
+        ${inc.desc}
+      </td>
       <td style="color:var(--success);font-weight:700">${parseFloat(inc.amount||0).toLocaleString('ar-EG')} ج</td>
       <td>${MONTHS_AR[(parseInt(inc.month)||1)-1]||inc.month} ${inc.year||''}</td>
       <td>${inc.date||''}</td>
-      <td><button class="btn btn-xs btn-danger" onclick="deleteIncome('${inc.id}')"><i class="fas fa-trash"></i></button></td>
+      <td><button class="btn btn-xs btn-danger" onclick="deleteIncome('${inc.id}')" title="${inc.autoFromPay?'حذف الإيراد وإلغاء الدفع':'حذف'}"><i class="fas fa-trash"></i></button></td>
     </tr>`
   ).join('');
 }
@@ -3926,9 +4644,11 @@ function openAddBook() {
   document.getElementById('bkPdfPrice').value = '';
   document.getElementById('bkPrintPrice').value = '';
   document.getElementById('bkCopies').value = '';
+  document.getElementById('bkStudents').value = '';
   document.getElementById('bkHasCover').checked = false;
   document.getElementById('bkCoverPrice').value = '';
   document.getElementById('coverPriceField').style.display = 'none';
+  document.getElementById('bkCostPreview').style.display = 'none';
   document.getElementById('bkEditId').value = '';
   openModal('bookModal');
 }
@@ -3942,10 +4662,12 @@ function openEditBook(id) {
   document.getElementById('bkPdfPrice').value = b.pdfPrice || '';
   document.getElementById('bkPrintPrice').value = b.printPrice || '';
   document.getElementById('bkCopies').value = b.copies || '';
+  document.getElementById('bkStudents').value = b.students || '';
   document.getElementById('bkHasCover').checked = b.hasCover || false;
   document.getElementById('bkCoverPrice').value = b.coverPrice || '';
   document.getElementById('coverPriceField').style.display = b.hasCover ? 'block' : 'none';
   document.getElementById('bkEditId').value = id;
+  previewBookCost();
   openModal('bookModal');
 }
 
@@ -3955,12 +4677,13 @@ function saveBook() {
   const pdfPrice   = parseFloat(document.getElementById('bkPdfPrice').value)||0;
   const printPrice = parseFloat(document.getElementById('bkPrintPrice').value)||0;
   const copies     = parseInt(document.getElementById('bkCopies').value)||0;
+  const students_  = parseInt(document.getElementById('bkStudents').value)||0;
   const hasCover   = document.getElementById('bkHasCover').checked;
   const coverPrice = hasCover ? (parseFloat(document.getElementById('bkCoverPrice').value)||0) : 0;
   const editId     = document.getElementById('bkEditId').value;
   if (!name) { toast('أدخل اسم الكتاب','error'); return; }
   const id = editId || db.ref('books').push().key;
-  const data = { id, name, sellPrice, pdfPrice, printPrice, copies, hasCover, coverPrice };
+  const data = { id, name, sellPrice, pdfPrice, printPrice, copies, students: students_, hasCover, coverPrice };
   db.ref(`books/${id}`).set(data).then(() => {
     toast('تم حفظ الكتاب','success');
     closeModal('bookModal');
@@ -3973,15 +4696,64 @@ function deleteBook(id) {
 }
 
 function calcBookProfit(b) {
-  // سعر الـ PDF = تكلفة ثابتة مرة واحدة (مش بتتضرب في النسخ)
-  // سعر الغلاف = تكلفة ثابتة مرة واحدة على كل الكتب
-  // سعر الطباعة = بيتضرب في عدد النسخ
-  const fixedCost   = (b.pdfPrice||0) + (b.hasCover ? (b.coverPrice||0) : 0);
-  const printCost   = (b.printPrice||0) * (b.copies||0);
-  const totalCost   = fixedCost + printCost;
-  const totalRevenue= (b.sellPrice||0) * (b.copies||0);
-  const profit      = totalRevenue - totalCost;
-  return { fixedCost, printCost, totalCost, totalRevenue, profit };
+  const copies   = b.copies   || 0;
+  const students = b.students || copies || 1; // fallback لعدد النسخ لو مش محدد
+
+  // التكاليف الثابتة تتقسم على عدد الطلاب
+  const pdfPerStudent    = students > 0 ? (b.pdfPrice||0) / students : 0;
+  const coverPerStudent  = (b.hasCover && students > 0) ? (b.coverPrice||0) / students : 0;
+  const fixedPerStudent  = pdfPerStudent + coverPerStudent;
+
+  // تكلفة الطباعة لكل نسخة
+  const printPerCopy     = b.printPrice || 0;
+
+  // إجمالي تكلفة النسخة الواحدة على الطالب
+  const costPerStudent   = fixedPerStudent + printPerCopy;
+
+  // إجمالي التكاليف الكلية
+  const totalFixedCost   = (b.pdfPrice||0) + (b.hasCover ? (b.coverPrice||0) : 0);
+  const totalPrintCost   = printPerCopy * copies;
+  const totalCost        = totalFixedCost + totalPrintCost;
+
+  // الإيرادات
+  const totalRevenue     = (b.sellPrice||0) * copies;
+  const profit           = totalRevenue - totalCost;
+  const profitPerStudent = (b.sellPrice||0) - costPerStudent;
+
+  return {
+    pdfPerStudent, coverPerStudent, fixedPerStudent,
+    printPerCopy, costPerStudent,
+    totalFixedCost, totalPrintCost, totalCost,
+    totalRevenue, profit, profitPerStudent,
+    students
+  };
+}
+
+// معاينة تكلفة الكتاب لحظياً في الموديال
+function previewBookCost() {
+  const preview    = document.getElementById('bkCostPreview');
+  if (!preview) return;
+  const pdfPrice   = parseFloat(document.getElementById('bkPdfPrice')?.value)||0;
+  const printPrice = parseFloat(document.getElementById('bkPrintPrice')?.value)||0;
+  const copies_    = parseInt(document.getElementById('bkCopies')?.value)||0;
+  const students_  = parseInt(document.getElementById('bkStudents')?.value)||0;
+  const sellPrice  = parseFloat(document.getElementById('bkSellPrice')?.value)||0;
+  const hasCover   = document.getElementById('bkHasCover')?.checked;
+  const coverPrice = hasCover ? (parseFloat(document.getElementById('bkCoverPrice')?.value)||0) : 0;
+  if (!students_ || students_ < 1) { preview.style.display = 'none'; return; }
+  const pdfEach   = pdfPrice / students_;
+  const covEach   = hasCover ? coverPrice / students_ : 0;
+  const costEach  = pdfEach + covEach + printPrice;
+  const profitEach= sellPrice - costEach;
+  preview.style.display = 'block';
+  preview.innerHTML = `
+    <strong style="color:var(--accent)">معاينة التكلفة لكل طالب:</strong>
+    PDF: <strong>${pdfEach.toFixed(2)}</strong> ج
+    ${hasCover ? `+ غلاف: <strong>${covEach.toFixed(2)}</strong> ج` : ''}
+    + طباعة: <strong>${printPrice}</strong> ج
+    = تكلفة/طالب: <strong style="color:var(--warning)">${costEach.toFixed(2)} ج</strong>
+    | ربح/طالب: <strong style="color:${profitEach>=0?'var(--success)':'var(--danger)'};">${profitEach.toFixed(2)} ج</strong>
+  `;
 }
 
 function renderBooks() {
@@ -4002,21 +4774,30 @@ function renderBooks() {
     sumRevenue += r.totalRevenue;
     return `<tr>
       <td><strong>${b.name}</strong></td>
-      <td title="تكلفة ثابتة مرة واحدة على كل الكتب">${(b.pdfPrice||0).toLocaleString('ar-EG')} ج</td>
-      <td title="سعر الطباعة × عدد النسخ">${(b.printPrice||0).toLocaleString('ar-EG')} ج/نسخة</td>
+      <td>
+        ${(b.pdfPrice||0).toLocaleString('ar-EG')} ج
+        ${r.students > 1 ? `<small style="display:block;color:var(--success)">÷${r.students} = ${r.pdfPerStudent.toFixed(2)} ج/طالب</small>` : ''}
+      </td>
+      <td>${(b.printPrice||0).toLocaleString('ar-EG')} ج/نسخة</td>
       <td>
         <span class="badge badge-accent">${b.copies||0} نسخة</span>
-        <small style="display:block;color:var(--text-muted);margin-top:2px">= ${r.printCost.toLocaleString('ar-EG')} ج</small>
+        <small style="display:block;color:var(--text-muted);margin-top:2px">= ${r.totalPrintCost.toLocaleString('ar-EG')} ج</small>
       </td>
       <td>${b.hasCover ? `<span class="badge badge-success">✅ يوجد</span>` : `<span class="badge badge-secondary">لا يوجد</span>`}</td>
-      <td title="تكلفة ثابتة مرة واحدة على كل الكتب">${b.hasCover ? (b.coverPrice||0).toLocaleString('ar-EG')+' ج' : '—'}</td>
+      <td>
+        ${b.hasCover ? (b.coverPrice||0).toLocaleString('ar-EG')+' ج' : '—'}
+        ${b.hasCover && r.students > 1 ? `<small style="display:block;color:var(--success)">÷${r.students} = ${r.coverPerStudent.toFixed(2)} ج/طالب</small>` : ''}
+      </td>
       <td style="color:var(--accent);font-weight:700">${(b.sellPrice||0).toLocaleString('ar-EG')} ج/نسخة</td>
       <td>
-        <div style="font-size:0.79rem;color:var(--text-muted)">PDF: ${(b.pdfPrice||0).toLocaleString('ar-EG')} ج + غلاف: ${b.hasCover?(b.coverPrice||0).toLocaleString('ar-EG'):0} ج</div>
-        <div style="font-size:0.79rem;color:var(--text-muted)">طباعة ${b.copies||0} × ${b.printPrice||0} = ${r.printCost.toLocaleString('ar-EG')} ج</div>
-        <div style="font-weight:700;color:var(--warning)">إجمالي: ${r.totalCost.toLocaleString('ar-EG')} ج</div>
+        <div style="font-size:0.79rem;color:var(--text-muted)">PDF/طالب: ${r.pdfPerStudent.toFixed(2)} ج${b.hasCover ? ` + غلاف/طالب: ${r.coverPerStudent.toFixed(2)} ج` : ''}</div>
+        <div style="font-size:0.79rem;color:var(--text-muted)">طباعة: ${b.printPrice||0} ج/نسخة</div>
+        <div style="font-weight:700;color:var(--warning)">تكلفة/طالب: ${r.costPerStudent.toFixed(2)} ج</div>
       </td>
-      <td style="color:${r.profit>=0?'var(--success)':'var(--danger)'};font-weight:700;font-size:1rem">${r.profit.toLocaleString('ar-EG')} ج</td>
+      <td>
+        <div style="color:${r.profit>=0?'var(--success)':'var(--danger)'};font-weight:700;font-size:1rem">${r.profit.toLocaleString('ar-EG')} ج</div>
+        <small style="color:${r.profitPerStudent>=0?'var(--success)':'var(--danger)'}">${r.profitPerStudent.toFixed(2)} ج/طالب</small>
+      </td>
       <td>
         <div style="display:flex;gap:4px">
           <button class="btn btn-xs btn-secondary" onclick="openEditBook('${b.id}')" title="تعديل"><i class="fas fa-edit"></i></button>
@@ -4028,8 +4809,8 @@ function renderBooks() {
   statsEl.innerHTML = `
     <div class="stat-card" style="border-color:rgba(240,192,64,0.4)"><div class="stat-icon">📚</div><div class="stat-val">${list.length}</div><div class="stat-label">عدد الكتب</div></div>
     <div class="stat-card stat-danger"><div class="stat-icon">💸</div><div class="stat-val">${sumCost.toLocaleString('ar-EG')}</div><div class="stat-label">إجمالي التكاليف</div></div>
-    <div class="stat-card stat-accent"><div class="stat-icon">💵</div><div class="stat-val">${sumRevenue.toLocaleString('ar-EG')}</div><div class="stat-label">إيرادات الكتب المتوقعة</div></div>
-    <div class="stat-card ${sumProfit>=0?'stat-success':'stat-danger'}"><div class="stat-icon">📈</div><div class="stat-val">${sumProfit.toLocaleString('ar-EG')}</div><div class="stat-label">صافي الربح من الكتب</div></div>`;
+    <div class="stat-card stat-accent"><div class="stat-icon">💵</div><div class="stat-val">${sumRevenue.toLocaleString('ar-EG')}</div><div class="stat-label">إيرادات الكتب</div></div>
+    <div class="stat-card ${sumProfit>=0?'stat-success':'stat-danger'}"><div class="stat-icon">📈</div><div class="stat-val">${sumProfit.toLocaleString('ar-EG')}</div><div class="stat-label">صافي الربح</div></div>`;
 }
 
 // =============================================
