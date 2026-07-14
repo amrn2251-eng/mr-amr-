@@ -1938,14 +1938,22 @@ function saveExam() {
   const questions = [];
   let valid = true;
   rows.forEach((row, qi) => {
-    const text    = row.querySelector('.q-text')?.value.trim() || '';
-    const qType   = row.querySelector('.q-type')?.value || 'mcq';
-    const opts    = [...row.querySelectorAll('.q-opt')].map(i => i.value.trim());
-    const correct = parseInt(row.querySelector('input[type=radio]:checked')?.value ?? 0);
+    const text        = row.querySelector('.q-text')?.value.trim() || '';
+    const qType       = row.querySelector('.q-type')?.value || 'mcq';
+    const opts        = [...row.querySelectorAll('.q-opt')].map(i => i.value.trim());
+    const correct     = parseInt(row.querySelector('input[type=radio]:checked')?.value ?? 0);
     const essayAnswer = row.querySelector('.q-essay-answer')?.value.trim() || '';
-    const imageUrl    = row.querySelector('.q-img-data')?.value || '';
+    let   imageUrl    = row.querySelector('.q-img-data')?.value || '';
+
     if (!text) { toast(`أدخل نص السؤال ${qi+1}`,'error'); valid=false; return; }
     if (qType === 'mcq' && opts.some(o=>!o)) { toast(`أدخل جميع خيارات السؤال ${qi+1}`,'error'); valid=false; return; }
+
+    // تحذير لو الصورة base64 كبيرة جداً (> 500KB)
+    if (imageUrl.startsWith('data:') && imageUrl.length > 500000) {
+      toast(`صورة السؤال ${qi+1} كبيرة جداً — استخدم رابط URL بدلاً من الرفع المباشر`, 'warning');
+      imageUrl = ''; // امسحها عشان ميفشلش الحفظ
+    }
+
     if (qType === 'mcq') questions.push({ text, type:'mcq', options: opts, correct, imageUrl });
     else questions.push({ text, type:'essay', essayAnswer, imageUrl });
   });
@@ -1954,10 +1962,24 @@ function saveExam() {
   const id   = editId || db.ref('exams').push().key;
   const data = { id, title, grade, duration, status, instructions: instr, questions,
                  createdAt: editId ? (examsData[editId]?.createdAt || Date.now()) : Date.now() };
+
+  // تحقق من حجم البيانات قبل الإرسال
+  const dataSize = JSON.stringify(data).length;
+  if (dataSize > 9 * 1024 * 1024) {
+    toast('حجم بيانات الامتحان كبير جداً (أكثر من 9MB) — قلّل الصور أو استخدم روابط URL', 'error');
+    return;
+  }
+
   db.ref(`exams/${id}`).set(data).then(() => {
     toast('تم حفظ الامتحان','success');
     closeModal('examModal');
-  }).catch(()=>toast('خطأ في الحفظ','error'));
+  }).catch(err => {
+    console.error('saveExam error:', err);
+    const msg = err?.message || '';
+    if (msg.includes('PERMISSION_DENIED')) toast('خطأ: ليس لديك صلاحية الكتابة — راجع قواعد Firebase','error');
+    else if (msg.includes('too large') || msg.includes('size')) toast('الامتحان كبير جداً — قلّل الصور','error');
+    else toast(`خطأ في الحفظ: ${msg || 'تحقق من الاتصال'}`, 'error');
+  });
 }
 
 function deleteExam(id) {
