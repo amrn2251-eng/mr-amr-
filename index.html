@@ -2522,11 +2522,21 @@ function saveExpense() {
   if (!desc)   { toast('أدخل وصف المصروف','error'); return; }
   if (!amount) { toast('أدخل مبلغ صحيح','error'); return; }
   const [year, month] = monthV.split('-');
-  const id = db.ref('expenses').push().key;
+  const id   = db.ref('expenses').push().key;
   const date = new Date().toLocaleDateString('ar-EG');
   db.ref(`expenses/${id}`).set({ id, desc, amount, month, year, date })
-    .then(() => { toast('تم إضافة المصروف','success'); document.getElementById('expenseModal')?.remove(); })
-    .catch(() => toast('خطأ في الحفظ','error'));
+    .then(() => {
+      toast('تم إضافة المصروف','success');
+      document.getElementById('expenseModal')?.remove();
+    })
+    .catch(err => {
+      const msg = err?.message || '';
+      if (msg.includes('PERMISSION_DENIED'))
+        toast('خطأ: ليس لديك صلاحية — افتح Firebase Console وعدّل الـ Rules','error');
+      else
+        toast(`خطأ في الحفظ: ${msg||'تحقق من الاتصال'}`, 'error');
+      console.error('saveExpense:', err);
+    });
 }
 
 function deleteExpense(id) {
@@ -5250,4 +5260,3 @@ if ('serviceWorker' in navigator) {
 
 </body>
 </html>
-
