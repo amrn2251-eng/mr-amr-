@@ -3112,7 +3112,8 @@ function renderStudentsTable() {
           ${s.phone!=='none' ? `<button class="btn btn-xs" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')" title="ترحيب"><i class="fab fa-whatsapp"></i></button>
           <button class="btn btn-xs btn-outline-accent" onclick="sendDailyReport('${s.id}')" title="يومي"><i class="fas fa-sun"></i></button>
           <button class="btn btn-xs" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')" title="شهري"><i class="fas fa-calendar"></i></button>
-          <button class="btn btn-xs" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)" onclick="sendScheduleToParent('${s.id}')" title="إرسال الجدول"><i class="fas fa-calendar-alt"></i></button>` : ''}
+          <button class="btn btn-xs" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)" onclick="sendScheduleToParent('${s.id}')" title="إرسال الجدول"><i class="fas fa-calendar-alt"></i></button>
+          <button class="btn btn-xs" style="background:rgba(240,192,64,0.15);color:var(--gold);border:1px solid rgba(240,192,64,0.4)" onclick="sendCodeWA('${s.id}')" title="إرسال الكود"><i class="fas fa-id-card"></i></button>` : ''}
           <button class="btn btn-xs btn-danger" onclick="openDeleteStudent('${s.id}')" title="حذف"><i class="fas fa-trash"></i></button>
         </div>
       </td>
@@ -3174,6 +3175,7 @@ function openStudentDetail(id) {
       <button class="btn btn-sm btn-outline-accent" onclick="sendDailyReport('${s.id}')"><i class="fas fa-sun"></i> يومي</button>
       <button class="btn btn-sm" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="sendMonthlyReport('${s.id}')"><i class="fas fa-calendar"></i> شهري</button>
       <button class="btn btn-sm" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)" onclick="sendScheduleToParent('${s.id}')"><i class="fas fa-calendar-alt"></i> جدول</button>
+      <button class="btn btn-sm" style="background:rgba(240,192,64,0.15);color:var(--gold);border:1px solid rgba(240,192,64,0.4)" onclick="sendCodeWA('${s.id}')"><i class="fas fa-id-card"></i> إرسال الكود</button>
     </div>`:''}`;
   openModal('studentDetailModal');
 }
@@ -3640,17 +3642,19 @@ function renderReports() {
   if (grade) rows = rows.filter(s => s.grade === grade);
   rows.sort((a,b) => (a.name||'').localeCompare(b.name||'','ar'));
   if (currentReportTab === 'daily') {
-    // التقرير اليومي معلق = حضر حصة بس لم يُرسل تقريرها اليومي
+    // التقرير اليومي معلق = حضر أو غاب ولم يُرسل تقريره
     const pending = [];
     rows.forEach(s => {
       if (s.phone === 'none') return;
-      const md = monthData[s.id] || {};
+      const md   = monthData[s.id] || {};
       const sess = md.sessions || {};
       const rep  = md.reportsSent || {};
-      for (let i = 1; i <= 8; i++) {
-        if (sess[`s${i}`] === true && !rep[`daily_s${i}`]) {
-          pending.push({ s, sessionNum: i, md });
-          break; // نأخذ أول حصة غير مُرسلة فقط
+      // ابحث من آخر حصة — حضور أو غياب بدون تقرير مُرسل
+      for (let i = 8; i >= 1; i--) {
+        const v = sess[`s${i}`];
+        if ((v === true || v === false) && !rep[`daily_s${i}`]) {
+          pending.push({ s, sessionNum: i, status: v, md });
+          break;
         }
       }
     });
@@ -3664,24 +3668,21 @@ function renderReports() {
         <span class="badge badge-warning">${pending.length}</span>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>الاسم</th><th>الصف</th><th>الكود</th><th>الحصة</th><th>درجة الاختبار</th><th>تاريخ الحصة</th><th>إرسال</th></tr></thead>
-        <tbody>${pending.map(({s, sessionNum, md}) => {
+        <thead><tr><th>الاسم</th><th>الصف</th><th>الكود</th><th>الحصة</th><th>الحالة</th><th>الدرجة</th><th>إرسال</th></tr></thead>
+        <tbody>${pending.map(({s, sessionNum, status, md}) => {
           const score = md.exams?.[`e${sessionNum}`];
-          const sessDate = md.sessionDates?.[`s${sessionNum}`] || '';
-          const dateDisplay = sessDate ? new Date(sessDate).toLocaleDateString('ar-EG') : '—';
           return `<tr>
             <td><strong>${s.name}</strong></td>
             <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
             <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px">${s.customCode||'-'}</code></td>
             <td><span class="badge badge-info">حصة ${sessionNum}</span></td>
-            <td>${score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/10</strong>` : '<span style="color:var(--warning)">لم تُسجل بعد</span>'}</td>
-            <td>${dateDisplay}</td>
+            <td>${status ? '<span class="badge badge-success">✅ حاضر</span>' : '<span class="badge badge-danger">❌ غائب</span>'}</td>
+            <td>${status ? (score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/10</strong>` : '<span style="color:var(--warning)">لم تُسجل</span>') : '—'}</td>
             <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendDailyReport('${s.id}')"><i class="fab fa-whatsapp"></i> إرسال</button></td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>
     </div>`;
-    // تم استبداله بالكود الجديد أعلاه - هذا السطر لن يُنفَّذ
   } else if (currentReportTab === 'monthly') {
     const pending = rows.filter(s => {
       if (s.phone === 'none') return false;
@@ -3846,36 +3847,53 @@ function sendWelcomeWA(studentId) {
   if (!s) return;
   const today = new Date().toLocaleDateString('ar-EG');
   const lbl = studentLabel(s);
-  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\nالسلام عليكم ورحمة الله وبركاته،\nتحية طيبة وبعد..\n\nتم تسجيل ${lbl.student}: *${s.name}* بنجاح في منصة الأوربيتالي.\nنُبارك لحضرتك هذا التسجيل ونهنئك بـ${lbl.joined} إلى المنصة 🎉\n\n📚 *الصف الدراسي:* ${s.grade}\n📅 *تاريخ الالتحاق:* ${today}\n\nسيتم إخطار حضرتك بتقارير الحضور والدرجات بشكل منتظم إن شاء الله 📊\n\n📸 *تنبيه مهم:*\nمن فضلك أرسل ${lbl.photo} على هذا الرقم لاستخراج *${lbl.carneh}* الخاص بـ *${s.name}* 🪪\n\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
+  const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\nالسلام عليكم ورحمة الله وبركاته،\nتحية طيبة وبعد..\n\nتم تسجيل ${lbl.student}: *${s.name}* بنجاح في منصة الأوربيتالي.\nنُبارك لحضرتك هذا التسجيل ونهنئك بـ${lbl.joined} إلى المنصة 🎉\n\n📚 *الصف الدراسي:* ${s.grade}\n📅 *تاريخ الالتحاق:* ${today}\n\n🪪 *كود ${lbl.student} الخاص:*  *${s.customCode || '—'}*\n_(احتفظ بهذا الكود — بيستخدم لمتابعة بيانات ${lbl.student} على المنصة)_\n\nسيتم إخطار حضرتك بتقارير الحضور والدرجات بشكل منتظم إن شاء الله 📊\n\n📸 *تنبيه مهم:*\nمن فضلك أرسل ${lbl.photo} على هذا الرقم لاستخراج *${lbl.carneh}* الخاص بـ *${s.name}* 🪪\n\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
   openWA(s.phone, msg);
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/welcome`).set(true);
   toast('تم فتح واتساب لإرسال الترحيب','success');
 }
 
+// إرسال الكود فقط — رسالة مستقلة
+function sendCodeWA(studentId) {
+  const s = students[studentId];
+  if (!s || s.phone === 'none') { toast('لا يوجد رقم واتساب لهذا الطالب','warning'); return; }
+  const lbl = studentLabel(s);
+  const msg = `🪪 *كود ${lbl.student} على منصة الأوربيتالي*\n\n${lbl.student}: *${s.name}*\n📚 الصف: *${s.grade}*\n\n🔑 *الكود الخاص:*\n*${s.customCode || '—'}*\n\n_(هذا الكود يُستخدم لمتابعة بيانات ${lbl.student} والدخول على الامتحانات الإلكترونية)_\n\n🪐 *منصة الأوربيتالي*`;
+  openWA(s.phone, msg);
+  toast(`تم فتح واتساب لإرسال الكود إلى ${s.name}`, 'success');
+}
+
 function sendDailyReport(studentId) {
   const s = students[studentId];
   if (!s) return;
-  const md = monthData[studentId] || {};
+  const md   = monthData[studentId] || {};
   const sess = md.sessions || {};
   const exams = md.exams || {};
-  const rep = md.reportsSent || {};
+  const rep  = md.reportsSent || {};
 
-  // إيجاد آخر حصة حضر فيها ولم يُرسل تقريرها بعد
+  // إيجاد آخر حصة سُجِّل فيها حضور أو غياب (true أو false) ولم يُرسل تقريرها بعد
   let targetSession = 0;
+  let targetStatus  = null; // true = حاضر، false = غائب
   for (let i = 8; i >= 1; i--) {
-    if (sess[`s${i}`] === true && !rep[`daily_s${i}`]) {
+    const v = sess[`s${i}`];
+    if ((v === true || v === false) && !rep[`daily_s${i}`]) {
       targetSession = i;
+      targetStatus  = v;
       break;
     }
   }
-  // لو كل الحصص اتبعتلها تقارير، بعت للأحدث (آخر حصة حضرها)
+  // لو كل الحصص اتبعتلها — ابعت للأحدث
   if (!targetSession) {
     for (let i = 8; i >= 1; i--) {
-      if (sess[`s${i}`] === true) { targetSession = i; break; }
+      if (sess[`s${i}`] === true || sess[`s${i}`] === false) {
+        targetSession = i;
+        targetStatus  = sess[`s${i}`];
+        break;
+      }
     }
   }
 
-  if (!targetSession) { toast('لا يوجد حضور مسجل لهذا الطالب','warning'); return; }
+  if (!targetSession) { toast('لا يوجد حضور أو غياب مسجل لهذا الطالب','warning'); return; }
 
   const score = exams[`e${targetSession}`];
   const scoreText = (score != null && score !== '') ? `${score}` : 'لم يُسجل بعد';
@@ -3883,19 +3901,27 @@ function sendDailyReport(studentId) {
   const dateDisplay = sessionDate
     ? new Date(sessionDate).toLocaleDateString('ar-EG')
     : new Date().toLocaleDateString('ar-EG');
+  const lbl = studentLabel(s);
 
-  // حالة الدفع - تُرسل مرة واحدة فقط لو لم ترسل من قبل
+  // حالة الدفع
   let payLine = '';
   if (isPrivateType(s.type) && md.paid && !rep.paymentSent) {
     payLine = `\n• حالة الدفع: *تم تسجيل دفع المصاريف في يوم ${md.payDate||dateDisplay}* ✅`;
-    // سجّل إن حالة الدفع اتبعتت
     db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/paymentSent`).set(true);
   }
 
-  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${studentLabel(s).student}: *${s.name}*\n• حالة الحضور: *${studentLabel(s).present} ومتابع بالكامل ✅*\n• درجة اختبار حصة ${targetSession}: *${scoreText} / 10*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+  let msg = '';
+  if (targetStatus === true) {
+    // تقرير حضور
+    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *${lbl.present} ومتابع بالكامل ✅*\n• درجة اختبار حصة ${targetSession}: *${scoreText} / 10*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+  } else {
+    // تقرير غياب
+    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *إشعار غياب*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *❌ غائب — الحصة ${targetSession}*\n\n⚠️ يُرجى الاهتمام بانتظام حضور ${lbl.student} — الغياب يؤثر على مستوى ${lbl.him} بشكل مباشر.\n\nلمعرفة المادة الفائتة أو لتحديد موعد للتعويض تواصل مع المستر 📩`;
+  }
+
   openWA(s.phone, msg);
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/daily_s${targetSession}`).set(true);
-  toast('تم فتح واتساب للتقرير اليومي','success');
+  toast(`تم فتح واتساب لتقرير ${targetStatus ? 'الحضور' : 'الغياب'} — ${s.name}`, 'success');
 }
 
 function sendMonthlyReport(studentId) {
