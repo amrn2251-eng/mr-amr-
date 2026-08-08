@@ -3341,7 +3341,7 @@ function renderAttendanceTable() {
     document.getElementById('attSummary').style.display = 'none';
     return;
   }
-  let rows = Object.values(students).filter(s => s.grade === grade);
+  let rows = Object.values(students).filter(s => s.grade === grade && (s.status||'active') === 'active');
   // فلتر حسب نوع المساعد
   rows = _filterByAssistantType(rows);
   rows.sort((a,b) => (a.name||'').localeCompare(b.name||'','ar'));
@@ -3642,15 +3642,18 @@ function renderReports() {
   if (grade) rows = rows.filter(s => s.grade === grade);
   rows.sort((a,b) => (a.name||'').localeCompare(b.name||'','ar'));
   if (currentReportTab === 'daily') {
-    // آخر حصة مسجّلة لكل طالب (حضور أو غياب) — بدون شرط الإرسال
+    // التقارير اليومية المعلقة = حصة سُجِّل فيها حضور/غياب ولم يُرسل تقريرها بعد
     const pending = [];
     rows.forEach(s => {
       if (s.phone === 'none') return;
+      if ((s.status||'active') === 'left') return;          // تجاهل من غادر
       const md   = monthData[s.id] || {};
       const sess = md.sessions || {};
+      const rep  = md.reportsSent || {};
+      // ابحث من آخر حصة — حضور أو غياب بدون تقرير مُرسل
       for (let i = 8; i >= 1; i--) {
         const v = sess[`s${i}`];
-        if (v === true || v === false) {
+        if ((v === true || v === false) && !rep[`daily_s${i}`]) {
           pending.push({ s, sessionNum: i, status: v, md });
           break;
         }
@@ -3662,8 +3665,8 @@ function renderReports() {
     }
     container.innerHTML = `<div class="card" style="padding:0">
       <div class="card-header" style="padding:14px 18px">
-        <span class="card-title">تقارير يومية</span>
-        <span class="badge badge-accent">${pending.length}</span>
+        <span class="card-title">تقارير يومية معلقة</span>
+        <span class="badge badge-warning">${pending.length}</span>
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th>الاسم</th><th>الصف</th><th>الكود</th><th>الحصة</th><th>الحالة</th><th>الدرجة</th><th>إرسال</th></tr></thead>
@@ -3903,7 +3906,7 @@ function sendDailyReport(studentId) {
   if (targetStatus === true) {
     msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *${lbl.present} ومتابع بالكامل ✅* — حصة ${targetSession}\n• درجة اختبار حصة ${targetSession}: *${scoreText} / 10*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
   } else {
-    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *إشعار غياب*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *❌ غائب — الحصة ${targetSession}*\n\n⚠️ يُرجى الاهتمام بانتظام حضور ${lbl.student} — الغياب يؤثر على مستوى ${lbl.him} بشكل مباشر.\n\nلمعرفة المادة الفائتة أو لتحديد موعد للتعويض تواصل مع المستر 📩`;
+    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *إشعار غياب*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *❌ غائب — الحصة ${targetSession}*\n\n⚠️ يُرجى الاهتمام بانتظام حضور ${lbl.student} — الغياب يؤثر على مستوى ${lbl.him} بشكل مباشر.\n\nلمعرفة المادة الفائتة تواصل مع المستر 📩`;
   }
 
   openWA(s.phone, msg);
