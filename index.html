@@ -992,6 +992,26 @@
         </select>
       </div>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label><i class="fas fa-clock" style="color:var(--success)"></i> وقت فتح الامتحان (اختياري)</label>
+        <input type="datetime-local" id="exStartTime" class="form-control">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px">لو تركته فارغاً يفتح فوراً بعد النشر</div>
+      </div>
+      <div class="form-group">
+        <label><i class="fas fa-clock" style="color:var(--danger)"></i> وقت إغلاق الامتحان (اختياري)</label>
+        <input type="datetime-local" id="exEndTime" class="form-control">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px">لو تركته فارغاً يظل مفتوحاً حتى تغيّر الحالة</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label><i class="fas fa-user-check" style="color:var(--warning)"></i> سماحية الدخول بعد الوقت (دقيقة)</label>
+        <input type="number" id="exGracePeriod" class="form-control" placeholder="0" min="0" max="60">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px">0 = لا يُسمح لأحد بالدخول بعد وقت الإغلاق</div>
+      </div>
+      <div class="form-group"></div>
+    </div>
     <div class="form-group">
       <label>تعليمات الامتحان (اختياري)</label>
       <textarea id="exInstructions" class="form-control" rows="2" placeholder="اكتب التعليمات هنا..."></textarea>
@@ -1493,10 +1513,22 @@ function loadStudentExams(s) {
   const container = document.getElementById('studentExamContent');
   container.innerHTML = `<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>جاري التحميل...</p></div>`;
   db.ref('exams').once('value', snap => {
-    const all = snap.val() || {};
-    const available = Object.values(all).filter(ex =>
-      ex.status === 'active' && ex.grade === s.grade
-    );
+    const all  = snap.val() || {};
+    const now  = Date.now();
+    const available = Object.values(all).filter(ex => {
+      if (ex.status !== 'active') return false;
+      if (ex.grade  !== s.grade)  return false;
+      // تحقق وقت الفتح
+      if (ex.startTime && new Date(ex.startTime).getTime() > now) return false;
+      // تحقق وقت الإغلاق + سماحية
+      if (ex.endTime) {
+        const endMs    = new Date(ex.endTime).getTime();
+        const graceMs  = (ex.gracePeriod || 0) * 60000;
+        if (now > endMs + graceMs) return false;
+      }
+      return true;
+    });
+
     if (!available.length) {
       container.innerHTML = `<div class="empty-state" style="margin-top:60px">
         <i class="fas fa-clipboard" style="font-size:3rem;color:var(--text-muted)"></i>
@@ -1504,7 +1536,7 @@ function loadStudentExams(s) {
       </div>`;
       return;
     }
-    // اجلب نتائج الطالب
+
     db.ref(`examResults/${s.id}`).once('value', rSnap => {
       const results = rSnap.val() || {};
       container.innerHTML = `
@@ -1513,8 +1545,19 @@ function loadStudentExams(s) {
         </h2>
         <div style="display:grid;gap:14px">
           ${available.map(ex => {
-            const done = results[ex.id];
-            return `<div class="card" style="border-color:${done ? 'rgba(63,185,80,0.3)' : 'rgba(79,142,247,0.2)'}">
+            const done    = results[ex.id];
+            const now2    = Date.now();
+            const endMs   = ex.endTime   ? new Date(ex.endTime).getTime()   : null;
+            const startMs = ex.startTime ? new Date(ex.startTime).getTime() : null;
+            const graceMs = (ex.gracePeriod||0)*60000;
+            // هل الوقت في فترة السماحية؟
+            const inGrace = endMs && now2 > endMs && now2 <= endMs + graceMs;
+            const timeInfo = endMs
+              ? `<span style="font-size:0.78rem;color:${inGrace?'var(--warning)':'var(--text-muted)'}">
+                   ${inGrace ? '⚠️ فترة السماحية — ينتهي قريباً' : `🕐 ينتهي: ${new Date(endMs).toLocaleString('ar-EG')}`}
+                 </span>`
+              : '';
+            return `<div class="card" style="border-color:${done?'rgba(63,185,80,0.3)':inGrace?'rgba(245,158,11,0.4)':'rgba(79,142,247,0.2)'}">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
                 <div style="flex:1">
                   <div style="font-size:1rem;font-weight:800;margin-bottom:4px">${ex.title}</div>
@@ -1523,6 +1566,7 @@ function loadStudentExams(s) {
                     ${ex.duration ? ` · <i class="fas fa-clock"></i> ${ex.duration} دقيقة` : ''}
                     · ${(ex.questions||[]).length} سؤال
                   </div>
+                  ${timeInfo}
                   ${ex.instructions ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px;background:var(--bg-card2);padding:6px 10px;border-radius:6px">${ex.instructions}</div>` : ''}
                 </div>
                 <div style="text-align:center;flex-shrink:0">
@@ -1531,8 +1575,7 @@ function loadStudentExams(s) {
                        <div style="font-size:1.2rem;font-weight:800;color:var(--success);margin-top:4px">${done.score}/${done.total}</div>`
                     : `<button class="btn btn-primary" onclick="startStudentExam('${ex.id}','${s.id}')">
                          <i class="fas fa-play"></i> ابدأ الامتحان
-                       </button>`
-                  }
+                       </button>`}
                 </div>
               </div>
             </div>`;
@@ -1608,6 +1651,23 @@ function startStudentExam(examId, studentId) {
     // attach answers object to window scope
     window._currentExamAnswers = answers;
     window._currentExamData    = ex;
+    window._currentExamId      = examId;
+    window._currentExamStudentId = studentId;
+
+    // كشف مغادرة الصفحة — لو الطالب غاب 30 ثانية يُسلَّم تلقائياً
+    let _visibilityTimer = null;
+    function _onVisibilityChange() {
+      if (document.hidden) {
+        _visibilityTimer = setTimeout(() => {
+          toast('تم تسليم الامتحان تلقائياً — خرجت من الصفحة لأكثر من 30 ثانية', 'warning');
+          submitExam(examId, studentId);
+        }, 30000);
+      } else {
+        if (_visibilityTimer) { clearTimeout(_visibilityTimer); _visibilityTimer = null; }
+      }
+    }
+    document.addEventListener('visibilitychange', _onVisibilityChange);
+    window._examVisibilityHandler = _onVisibilityChange;
 
     // timer
     if (ex.duration) {
@@ -1656,6 +1716,11 @@ function selectAnswer(qi, oi, total) {
 
 function submitExam(examId, studentId) {
   if (window._examTimer) clearInterval(window._examTimer);
+  // إزالة مراقب المغادرة
+  if (window._examVisibilityHandler) {
+    document.removeEventListener('visibilitychange', window._examVisibilityHandler);
+    window._examVisibilityHandler = null;
+  }
   const ex      = window._currentExamData;
   const answers = window._currentExamAnswers || {};
   const qs      = ex.questions || [];
@@ -1777,9 +1842,12 @@ function openAddExam() {
   document.getElementById('exDuration').value = '60';
   document.getElementById('exStatus').value = 'draft';
   document.getElementById('exInstructions').value = '';
+  document.getElementById('exStartTime').value = '';
+  document.getElementById('exEndTime').value = '';
+  document.getElementById('exGracePeriod').value = '0';
   document.getElementById('exEditId').value = '';
   document.getElementById('questionsContainer').innerHTML = '';
-  addQuestionRow(); // سؤال أول تلقائياً
+  addQuestionRow();
   openModal('examModal');
 }
 
@@ -1792,6 +1860,9 @@ function openEditExam(id) {
   document.getElementById('exDuration').value = ex.duration || 60;
   document.getElementById('exStatus').value = ex.status || 'draft';
   document.getElementById('exInstructions').value = ex.instructions || '';
+  document.getElementById('exStartTime').value = ex.startTime || '';
+  document.getElementById('exEndTime').value = ex.endTime || '';
+  document.getElementById('exGracePeriod').value = ex.gracePeriod ?? 0;
   document.getElementById('exEditId').value = id;
   document.getElementById('questionsContainer').innerHTML = '';
   (ex.questions || []).forEach(q => addQuestionRow(q));
@@ -1980,6 +2051,9 @@ function saveExam() {
 
   const id   = editId || db.ref('exams').push().key;
   const data = { id, title, grade, duration, status, instructions: instr, questions,
+                 startTime:    document.getElementById('exStartTime').value || null,
+                 endTime:      document.getElementById('exEndTime').value   || null,
+                 gracePeriod:  parseInt(document.getElementById('exGracePeriod').value)||0,
                  createdAt: editId ? (examsData[editId]?.createdAt || Date.now()) : Date.now() };
 
   // تحقق من حجم البيانات قبل الإرسال
@@ -2015,7 +2089,7 @@ function viewExamResults(examId) {
     Object.entries(all).forEach(([sid, exs]) => {
       if (exs[examId]) {
         const s = students[sid];
-        results.push({ student: s, result: exs[examId] });
+        results.push({ student: s, sid, result: exs[examId] });
       }
     });
     const existing = document.getElementById('examResultsModal');
@@ -2023,6 +2097,39 @@ function viewExamResults(examId) {
     const modal = document.createElement('div');
     modal.id = 'examResultsModal';
     modal.className = 'modal-backdrop open';
+
+    // عرض الإجابات التفصيلية لطالب
+    const detailsHtml = results.map(r => {
+      const qs = ex.questions || [];
+      const det = r.result.detail || [];
+      const essayRows = det.map((d, qi) => {
+        if (d.type !== 'essay') return '';
+        const q = qs[qi] || {};
+        return `<div style="background:var(--bg-card2);border-radius:8px;padding:10px 14px;margin-bottom:8px;border:1px solid var(--border)">
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:4px">سؤال ${qi+1} — مقالي</div>
+          <div style="font-weight:700;margin-bottom:6px">${q.text||''}</div>
+          <div style="background:rgba(79,142,247,0.08);padding:8px 10px;border-radius:6px;font-size:0.88rem;color:var(--text-primary);white-space:pre-wrap">${d.essayText||'(لم يكتب إجابة)'}</div>
+          ${q.essayAnswer ? `<div style="font-size:0.78rem;color:var(--success);margin-top:6px"><i class="fas fa-key"></i> نموذج الإجابة: ${q.essayAnswer}</div>` : ''}
+          <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+            <label style="font-size:0.8rem;color:var(--text-secondary)">الدرجة:</label>
+            <input type="number" class="form-control" style="width:80px;font-size:0.9rem;padding:4px 8px"
+              min="0" placeholder="—"
+              value="${r.result.essayScores?.[qi]??''}"
+              onchange="saveEssayScore('${r.sid}','${examId}',${qi},this.value)">
+            <span style="font-size:0.78rem;color:var(--text-muted)">/ 10</span>
+          </div>
+        </div>`;
+      }).filter(Boolean).join('');
+
+      if (!essayRows) return '';
+      return `<div style="margin-bottom:16px">
+        <div style="font-weight:700;color:var(--accent);margin-bottom:8px;font-size:0.9rem">
+          <i class="fas fa-user-graduate"></i> ${r.student?.name||'—'} — إجابات المقالي
+        </div>
+        ${essayRows}
+      </div>`;
+    }).filter(Boolean).join('');
+
     modal.innerHTML = `
       <div class="modal modal-lg">
         <div class="modal-header">
@@ -2031,29 +2138,57 @@ function viewExamResults(examId) {
         </div>
         ${!results.length
           ? `<div class="empty-state"><i class="fas fa-inbox"></i><p>لم يؤدِ أحد هذا الامتحان بعد</p></div>`
-          : `<div class="table-wrap"><table>
-              <thead><tr><th>الطالب</th><th>الصف</th><th>الدرجة</th><th>النسبة</th><th>التاريخ</th></tr></thead>
-              <tbody>${results.sort((a,b)=>b.result.score-a.result.score).map((r,i)=>`<tr>
+          : `<div class="table-wrap" style="margin-bottom:${detailsHtml?'16px':'0'}"><table>
+              <thead><tr><th>الطالب</th><th>الصف</th><th>الدرجة</th><th>النسبة</th><th>التاريخ</th><th>حالة المقالي</th></tr></thead>
+              <tbody>${results.sort((a,b)=>b.result.score-a.result.score).map(r=>`<tr>
                 <td><strong>${r.student?.name||'—'}</strong></td>
                 <td><span class="badge badge-accent" style="font-size:0.75rem">${r.student?.grade||'—'}</span></td>
                 <td style="font-weight:700;color:var(--success)">${r.result.score}/${r.result.total}</td>
                 <td>
                   <div style="display:flex;align-items:center;gap:8px">
                     <div style="flex:1;background:var(--bg-card2);border-radius:4px;height:8px;overflow:hidden">
-                      <div style="height:100%;width:${Math.round(r.result.score/r.result.total*100)}%;background:${r.result.score/r.result.total>=0.7?'var(--success)':r.result.score/r.result.total>=0.5?'var(--warning)':'var(--danger)'}"></div>
+                      <div style="height:100%;width:${r.result.total?Math.round(r.result.score/r.result.total*100):0}%;background:${r.result.total&&r.result.score/r.result.total>=0.7?'var(--success)':r.result.total&&r.result.score/r.result.total>=0.5?'var(--warning)':'var(--danger)'}"></div>
                     </div>
-                    <span style="font-size:0.82rem">${Math.round(r.result.score/r.result.total*100)}%</span>
+                    <span style="font-size:0.82rem">${r.result.total?Math.round(r.result.score/r.result.total*100):0}%</span>
                   </div>
                 </td>
-                <td style="font-size:0.8rem;color:var(--text-muted)">${r.result.submittedAt ? new Date(r.result.submittedAt).toLocaleDateString('ar-EG') : '—'}</td>
+                <td style="font-size:0.8rem;color:var(--text-muted)">${r.result.submittedAt?new Date(r.result.submittedAt).toLocaleDateString('ar-EG'):'—'}</td>
+                <td>${r.result.hasEssay
+                  ? (r.result.essayPending
+                      ? '<span class="badge badge-warning">⏳ في الانتظار</span>'
+                      : '<span class="badge badge-success">✅ صُحِّح</span>')
+                  : '—'}</td>
               </tr>`).join('')}</tbody>
-            </table></div>`
+            </table></div>
+            ${detailsHtml ? `<div style="margin-top:8px"><div style="font-weight:700;margin-bottom:12px;color:var(--accent)"><i class="fas fa-pen-to-square"></i> تصحيح الأسئلة المقالية</div>${detailsHtml}</div>` : ''}`
         }
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="document.getElementById('examResultsModal').remove()">إغلاق</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
+  });
+}
+
+function saveEssayScore(studentId, examId, qi, val) {
+  const score = val === '' ? null : parseFloat(val);
+  if (score !== null && isNaN(score)) return;
+  db.ref(`examResults/${studentId}/${examId}/essayScores/${qi}`).set(score).then(() => {
+    // تحديث essayPending لو كل الأسئلة المقالية اتصححت
+    db.ref(`examResults/${studentId}/${examId}`).once('value', snap => {
+      const res = snap.val();
+      if (!res) return;
+      const ex = examsData[examId];
+      if (!ex) return;
+      const essayQs = (ex.questions||[]).filter(q => q.type === 'essay');
+      const scores  = res.essayScores || {};
+      const allDone = essayQs.every((_, i) => {
+        const origIdx = (ex.questions||[]).findIndex((q,ii) => q.type==='essay' && ii===i);
+        return scores[origIdx] != null;
+      });
+      if (allDone) db.ref(`examResults/${studentId}/${examId}/essayPending`).set(false);
+    });
+    toast('تم حفظ الدرجة', 'success');
   });
 }
 
@@ -3910,7 +4045,15 @@ function sendDailyReport(studentId) {
   }
 
   openWA(s.phone, msg);
+  // تحديث المتغير المحلي فوراً عشان يختفي من التقارير المعلقة
+  if (!monthData[studentId]) monthData[studentId] = {};
+  if (!monthData[studentId].reportsSent) monthData[studentId].reportsSent = {};
+  monthData[studentId].reportsSent[`daily_s${targetSession}`] = true;
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/daily_s${targetSession}`).set(true);
+  // إعادة عرض التقارير إذا كانت مفتوحة
+  if (currentReportTab === 'daily' && document.getElementById('tab-reports')?.classList.contains('active')) {
+    renderReports();
+  }
   toast(`تم فتح واتساب لتقرير ${targetStatus ? 'الحضور' : 'الغياب'} — ${s.name} (حصة ${targetSession})`, 'success');
 }
 
@@ -5342,4 +5485,3 @@ if ('serviceWorker' in navigator) {
 
 </body>
 </html>
-V
