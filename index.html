@@ -1525,6 +1525,7 @@ function loadStudentExams(s) {
       ex.status === 'active' && ex.grade === s.grade
     );
 
+    // لو مافيش أي امتحانات أصلاً (لا مفتوحة ولا مجدولة)
     if (!exams.length) {
       container.innerHTML = `<div class="empty-state" style="margin-top:60px">
         <i class="fas fa-clipboard" style="font-size:3rem;color:var(--text-muted)"></i>
@@ -1576,7 +1577,24 @@ function _renderExamList(container, s, exams, results) {
     <i class="fas fa-file-pen"></i> الامتحانات
   </h2><div style="display:grid;gap:14px">`;
 
+  // ── رسالة لو مافيش امتحانات مفتوحة حالياً ──
+  if (open.length === 0 && upcoming.length > 0) {
+    html += `<div class="card" style="background:rgba(79,142,247,0.05);border-color:rgba(79,142,247,0.25)">
+      <div style="text-align:center;padding:16px">
+        <i class="fas fa-calendar-check" style="font-size:2.2rem;color:var(--accent);margin-bottom:10px"></i>
+        <div style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:6px">مافيش امتحانات متاحة دلوقتي</div>
+        <div style="font-size:0.88rem;color:var(--text-secondary)">فيه امتحانات مجدولة قادمة — شوف تفاصيلهم تحت 👇</div>
+      </div>
+    </div>`;
+  }
+
   // ── امتحانات مفتوحة ──
+  if (open.length > 0) {
+    html += `<div style="font-size:0.82rem;font-weight:700;color:var(--success);margin:8px 0 4px;padding-right:4px">
+      <i class="fas fa-circle" style="font-size:0.5rem;margin-left:6px"></i> امتحانات متاحة الآن
+    </div>`;
+  }
+  
   open.forEach(ex => {
     const done  = results[ex.id];
     const endMs = ex.endTime ? new Date(ex.endTime).getTime() : null;
@@ -1615,20 +1633,26 @@ function _renderExamList(container, s, exams, results) {
 
   // ── امتحانات لم يحن وقتها ──
   if (upcoming.length) {
-    html += `<div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin:8px 0 4px;padding-right:4px">⏳ امتحانات قادمة</div>`;
+    html += `<div style="font-size:0.82rem;font-weight:700;color:var(--warning);margin:16px 0 4px;padding-right:4px;border-right:3px solid var(--warning);padding-right:10px">
+      <i class="fas fa-hourglass-half" style="margin-left:6px"></i> امتحانات قادمة (${upcoming.length})
+    </div>`;
     upcoming.forEach(ex => {
       const startMs   = new Date(ex.startTime).getTime();
       const minsToStart = Math.ceil((startMs - now) / 60000);
       const startStr  = new Date(ex.startTime).toLocaleString('ar-EG', {weekday:'short',hour:'2-digit',minute:'2-digit'});
-      html += `<div class="card" style="border-color:rgba(88,166,255,0.25);opacity:0.9">
+      html += `<div class="card" style="border-color:rgba(245,158,11,0.4);opacity:0.95;background:linear-gradient(145deg, rgba(245,158,11,0.03), rgba(245,158,11,0.01));position:relative;overflow:visible">
+        <!-- بادج "قريباً" في الزاوية -->
+        <div style="position:absolute;top:-6px;left:-6px;background:linear-gradient(135deg,var(--warning),#d29922);color:#000;font-size:0.7rem;font-weight:800;padding:4px 12px;border-radius:20px;box-shadow:0 2px 10px rgba(245,158,11,0.5);border:2px solid var(--bg-primary)">
+          ⏰ قريباً
+        </div>
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div style="flex:1">
             <div style="font-size:1rem;font-weight:800;margin-bottom:4px">${ex.title}</div>
             <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:6px">
               ${ex.grade}${ex.duration?` · ⏱ ${ex.duration} دقيقة`:''} · ${(ex.questions||[]).length} سؤال
             </div>
-            <div style="background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.25);border-radius:8px;padding:8px 12px;font-size:0.85rem">
-              <i class="fas fa-clock" style="color:var(--info)"></i>
+            <div style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:10px 14px;font-size:0.85rem">
+              <i class="fas fa-clock" style="color:var(--warning)"></i>
               يبدأ ${startStr} (بعد ${minsToStart < 60 ? minsToStart+' دقيقة' : Math.ceil(minsToStart/60)+' ساعة'})
             </div>
             ${ex.instructions?`<div style="font-size:0.82rem;color:var(--text-secondary);margin-top:8px;padding:8px 12px;background:var(--bg-card2);border-radius:6px">
@@ -1636,10 +1660,11 @@ function _renderExamList(container, s, exams, results) {
               ${ex.instructions}
             </div>`:''}
           </div>
-          <div style="flex-shrink:0">
-            <span class="badge" style="background:rgba(88,166,255,0.15);color:var(--info);font-size:0.82rem;padding:6px 12px">
-              <i class="fas fa-lock"></i> لم يفتح بعد
-            </span>
+          <div style="flex-shrink:0;text-align:center">
+            <div style="width:64px;height:64px;border-radius:50%;background:rgba(245,158,11,0.1);border:2px solid rgba(245,158,11,0.35);display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+              <i class="fas fa-lock locked-exam-icon" style="font-size:1.5rem;color:var(--warning)"></i>
+            </div>
+            <span style="font-size:0.75rem;color:var(--text-muted);display:block">مجدول</span>
           </div>
         </div>
       </div>`;
@@ -5570,3 +5595,4 @@ if ('serviceWorker' in navigator) {
 
 </body>
 </html>
+
