@@ -1520,10 +1520,23 @@ function loadStudentExams(s) {
     const all = snap.val() || {};
     const now = Date.now();
 
-    // الامتحانات المنشورة لهذه المرحلة (مفتوحة + مجدولة)
-    const exams = Object.values(all).filter(ex =>
-      ex.status === 'active' && ex.grade === s.grade
-    );
+    // الامتحانات لهذه المرحلة: 
+    // 1. المنشورة (active)
+    // 2. المغلقة (closed) اللي معادها لسه مجاش (startTime في المستقبل)
+    const exams = Object.values(all).filter(ex => {
+      if (ex.grade !== s.grade) return false;
+      
+      // لو منشور، يظهر
+      if (ex.status === 'active') return true;
+      
+      // لو مغلق (closed) ومعاه startTime في المستقبل، يظهر مع قفل
+      if (ex.status === 'closed' && ex.startTime) {
+        const startMs = new Date(ex.startTime).getTime();
+        return startMs > now; // يظهر لو معاده لسه مجاش
+      }
+      
+      return false;
+    });
 
     // لو مافيش أي امتحانات أصلاً (لا مفتوحة ولا مجدولة)
     if (!exams.length) {
@@ -1541,7 +1554,15 @@ function loadStudentExams(s) {
       window._examListRefresh = setInterval(() => {
         db.ref('exams').once('value', snap2 => {
           const all2   = snap2.val() || {};
-          const exams2 = Object.values(all2).filter(ex => ex.status === 'active' && ex.grade === s.grade);
+          const exams2 = Object.values(all2).filter(ex => {
+            if (ex.grade !== s.grade) return false;
+            if (ex.status === 'active') return true;
+            if (ex.status === 'closed' && ex.startTime) {
+              const startMs = new Date(ex.startTime).getTime();
+              return startMs > Date.now();
+            }
+            return false;
+          });
           db.ref(`examResults/${s.id}`).once('value', rSnap2 => {
             _renderExamList(container, s, exams2, rSnap2.val()||{});
           });
@@ -1555,7 +1576,7 @@ function _renderExamList(container, s, exams, results) {
   const now = Date.now();
 
   // تصنيف الامتحانات
-  const upcoming = []; // لم يحن وقتها
+  const upcoming = []; // لم يحن وقتها (مجدولة)
   const open     = []; // مفتوحة الآن
   const closed   = []; // انتهت (شاملة السماحية)
 
@@ -1564,12 +1585,24 @@ function _renderExamList(container, s, exams, results) {
     const endMs   = ex.endTime   ? new Date(ex.endTime).getTime()   : null;
     const graceMs = (ex.gracePeriod||0) * 60000;
 
-    if (startMs && now < startMs) {
+    // لو الامتحان "مغلق" (closed) ومعاده في المستقبل = قادم مع قفل
+    if (ex.status === 'closed' && startMs && now < startMs) {
       upcoming.push(ex);
-    } else if (endMs && now > endMs + graceMs) {
-      closed.push(ex);
-    } else {
-      open.push(ex);
+    }
+    // لو الامتحان "منشور" (active)
+    else if (ex.status === 'active') {
+      // لو معاده لسه مجاش = قادم
+      if (startMs && now < startMs) {
+        upcoming.push(ex);
+      }
+      // لو خلص ووقته عدى (حتى مع السماحية) = مغلق
+      else if (endMs && now > endMs + graceMs) {
+        closed.push(ex);
+      }
+      // غير كده = مفتوح
+      else {
+        open.push(ex);
+      }
     }
   });
 
@@ -1640,10 +1673,18 @@ function _renderExamList(container, s, exams, results) {
       const startMs   = new Date(ex.startTime).getTime();
       const minsToStart = Math.ceil((startMs - now) / 60000);
       const startStr  = new Date(ex.startTime).toLocaleString('ar-EG', {weekday:'short',hour:'2-digit',minute:'2-digit'});
-      html += `<div class="card" style="border-color:rgba(245,158,11,0.4);opacity:0.95;background:linear-gradient(145deg, rgba(245,158,11,0.03), rgba(245,158,11,0.01));position:relative;overflow:visible">
-        <!-- بادج "قريباً" في الزاوية -->
-        <div style="position:absolute;top:-6px;left:-6px;background:linear-gradient(135deg,var(--warning),#d29922);color:#000;font-size:0.7rem;font-weight:800;padding:4px 12px;border-radius:20px;box-shadow:0 2px 10px rgba(245,158,11,0.5);border:2px solid var(--bg-primary)">
-          ⏰ قريباً
+      
+      // هل الامتحان ده مغلق (closed) ولا منشور (active) لكن لسه معاده مجاش؟
+      const isLocked = ex.status === 'closed';
+      const lockColor = isLocked ? 'rgba(248,81,73,0.4)' : 'rgba(245,158,11,0.4)';
+      const lockBg = isLocked ? 'rgba(248,81,73,0.03)' : 'rgba(245,158,11,0.03)';
+      const badgeText = isLocked ? '🔒 مغلق' : '⏰ قريباً';
+      const badgeColor = isLocked ? 'var(--danger)' : 'var(--warning)';
+      
+      html += `<div class="card" style="border-color:${lockColor};opacity:0.95;background:linear-gradient(145deg, ${lockBg}, ${lockBg});position:relative;overflow:visible">
+        <!-- بادج في الزاوية -->
+        <div style="position:absolute;top:-6px;left:-6px;background:linear-gradient(135deg,${badgeColor},${isLocked?'#da3633':'#d29922'});color:${isLocked?'#fff':'#000'};font-size:0.7rem;font-weight:800;padding:4px 12px;border-radius:20px;box-shadow:0 2px 10px ${isLocked?'rgba(248,81,73,0.5)':'rgba(245,158,11,0.5)'};border:2px solid var(--bg-primary)">
+          ${badgeText}
         </div>
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div style="flex:1">
@@ -1651,9 +1692,12 @@ function _renderExamList(container, s, exams, results) {
             <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:6px">
               ${ex.grade}${ex.duration?` · ⏱ ${ex.duration} دقيقة`:''} · ${(ex.questions||[]).length} سؤال
             </div>
-            <div style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:10px 14px;font-size:0.85rem">
-              <i class="fas fa-clock" style="color:var(--warning)"></i>
-              يبدأ ${startStr} (بعد ${minsToStart < 60 ? minsToStart+' دقيقة' : Math.ceil(minsToStart/60)+' ساعة'})
+            <div style="background:${isLocked?'rgba(248,81,73,0.12)':'rgba(245,158,11,0.15)'};border:1px solid ${lockColor};border-radius:8px;padding:10px 14px;font-size:0.85rem">
+              <i class="fas fa-clock" style="color:${badgeColor}"></i>
+              ${isLocked 
+                ? `<strong>مغلق حالياً</strong> — يُفتح ${startStr} (بعد ${minsToStart < 60 ? minsToStart+' دقيقة' : Math.ceil(minsToStart/60)+' ساعة'})`
+                : `يبدأ ${startStr} (بعد ${minsToStart < 60 ? minsToStart+' دقيقة' : Math.ceil(minsToStart/60)+' ساعة'})`
+              }
             </div>
             ${ex.instructions?`<div style="font-size:0.82rem;color:var(--text-secondary);margin-top:8px;padding:8px 12px;background:var(--bg-card2);border-radius:6px">
               <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-info-circle"></i> التعليمات:</div>
@@ -1661,10 +1705,10 @@ function _renderExamList(container, s, exams, results) {
             </div>`:''}
           </div>
           <div style="flex-shrink:0;text-align:center">
-            <div style="width:64px;height:64px;border-radius:50%;background:rgba(245,158,11,0.1);border:2px solid rgba(245,158,11,0.35);display:flex;align-items:center;justify-content:center;margin-bottom:6px">
-              <i class="fas fa-lock locked-exam-icon" style="font-size:1.5rem;color:var(--warning)"></i>
+            <div style="width:64px;height:64px;border-radius:50%;background:${isLocked?'rgba(248,81,73,0.1)':'rgba(245,158,11,0.1)'};border:2px solid ${lockColor};display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+              <i class="fas fa-lock locked-exam-icon" style="font-size:1.5rem;color:${badgeColor}"></i>
             </div>
-            <span style="font-size:0.75rem;color:var(--text-muted);display:block">مجدول</span>
+            <span style="font-size:0.75rem;color:var(--text-muted);display:block">${isLocked ? 'مغلق' : 'مجدول'}</span>
           </div>
         </div>
       </div>`;
@@ -1680,11 +1724,35 @@ function startStudentExam(examId, studentId) {
   db.ref(`exams/${examId}`).once('value', snap => {
     const ex = snap.val();
     if (!ex) return;
+    
+    const now = Date.now();
+    const startMs = ex.startTime ? new Date(ex.startTime).getTime() : null;
+    const endMs   = ex.endTime   ? new Date(ex.endTime).getTime()   : null;
+    const graceMs = (ex.gracePeriod||0) * 60000;
+    
+    // فحص 1: لو الامتحان مغلق (status = closed) أو مسودة
+    if (ex.status !== 'active') {
+      showToast('هذا الامتحان غير متاح حالياً', 'error');
+      return;
+    }
+    
+    // فحص 2: لو الامتحان معاده لسه مجاش
+    if (startMs && now < startMs) {
+      const minsLeft = Math.ceil((startMs - now) / 60000);
+      showToast(`الامتحان لم يبدأ بعد — يبدأ بعد ${minsLeft} دقيقة`, 'error');
+      return;
+    }
+    
+    // فحص 3: لو الامتحان خلص (حتى مع السماحية)
+    if (endMs && now > endMs + graceMs) {
+      showToast('انتهى وقت الامتحان', 'error');
+      return;
+    }
+    
     const container = document.getElementById('studentExamContent');
     if (window._examListRefresh) { clearInterval(window._examListRefresh); window._examListRefresh = null; }
 
     // حساب الوقت المتبقي الفعلي بناءً على endTime لو موجود
-    const endMs     = ex.endTime ? new Date(ex.endTime).getTime() : null;
     const durationSec = (ex.duration || 60) * 60;
     // الوقت المتبقي = الأقل بين مدة الامتحان و(وقت الإغلاق - الآن)
     let timeLeft = endMs
@@ -5595,4 +5663,3 @@ if ('serviceWorker' in navigator) {
 
 </body>
 </html>
-
