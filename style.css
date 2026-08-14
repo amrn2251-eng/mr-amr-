@@ -468,6 +468,27 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .empty-state i { font-size: 3rem; margin-bottom: 12px; display: block; }
 .empty-state p { font-size: 0.95rem; }
 
+/* ── LOCKED EXAM CARD ── */
+.locked-exam-icon {
+  animation: lockPulse 2s ease-in-out infinite;
+}
+@keyframes lockPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.85; }
+}
+
+/* ── DRAG AND DROP QUESTIONS ── */
+.q-row.dragging {
+  opacity: 0.4;
+  border: 2px dashed var(--accent) !important;
+}
+.q-row {
+  transition: transform 0.2s;
+}
+.q-row:hover {
+  transform: translateX(-2px);
+}
+
 /* ── DANGER ZONE ── */
 .danger-zone { border: 1px solid var(--danger); border-radius: var(--radius); padding: 20px; margin-top: 20px; }
 .danger-zone h3 { color: var(--danger); margin-bottom: 12px; }
