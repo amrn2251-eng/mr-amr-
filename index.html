@@ -1903,69 +1903,96 @@ function submitExam(examId, studentId) {
   const answers = window._currentExamAnswers || {};
   const qs      = ex.questions || [];
 
-  let mcqScore = 0, mcqTotal = 0;
+  let earnedScore = 0, totalScore = 0;
   const detail = qs.map((q, qi) => {
+    const qGrade = q.grade || 1;
+    totalScore += qGrade;
+    
     if (q.type === 'essay') {
       const essayText = document.getElementById(`essay_${qi}`)?.value.trim() || '';
-      return { type:'essay', essayText, pending: true };
+      return { type:'essay', essayText, pending: true, grade: qGrade };
     }
     // اختياري
-    mcqTotal++;
     const chosen  = answers[qi] ?? -1;
     const correct = parseInt(q.correct ?? -1);
     const isRight = chosen === correct;
-    if (isRight) mcqScore++;
-    return { type:'mcq', chosen, correct, isRight };
+    if (isRight) earnedScore += qGrade;
+    return { type:'mcq', chosen, correct, isRight, grade: qGrade };
   });
 
   const hasEssay = detail.some(d => d.type === 'essay');
   const result = {
-    score: mcqScore, total: mcqTotal,
-    hasEssay, essayPending: hasEssay,
-    detail, submittedAt: Date.now()
+    score: earnedScore,
+    total: totalScore,
+    hasEssay,
+    essayPending: hasEssay,
+    detail,
+    answers,
+    submittedAt: Date.now()
   };
 
   db.ref(`examResults/${studentId}/${examId}`).set(result).then(() => {
     playBeep(true);
-    const pct = mcqTotal ? Math.round(mcqScore/mcqTotal*100) : null;
+    const pct = totalScore ? Math.round(earnedScore/totalScore*100) : 0;
     const container = document.getElementById('studentExamContent');
     container.innerHTML = `
       <div style="text-align:center;padding:40px 20px">
-        <div style="font-size:4rem;margin-bottom:16px">${pct===null?'📝':pct>=70?'🏆':pct>=50?'📝':'💪'}</div>
-        <div style="font-size:1.6rem;font-weight:900;margin-bottom:8px">تم التسليم!</div>
-        ${mcqTotal > 0 ? `
-          <div style="font-size:2.5rem;font-weight:900;color:${pct>=70?'var(--success)':pct>=50?'var(--warning)':'var(--danger)'}">
-            ${mcqScore} / ${mcqTotal}
-          </div>
-          <div style="font-size:1rem;color:var(--text-secondary);margin:8px 0">درجة الأسئلة الاختيارية: ${pct}%</div>` : ''}
-        ${hasEssay ? `<div style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);border-radius:10px;padding:12px 20px;margin:12px auto;max-width:400px;font-size:0.88rem;color:var(--warning)">
-          <i class="fas fa-clock"></i> الأسئلة المقالية في انتظار مراجعة المعلم — ستظهر درجتها لاحقاً
+        <div style="font-size:4rem;margin-bottom:16px">${pct>=70?'🏆':pct>=50?'✅':'💪'}</div>
+        <div style="font-size:1.6rem;font-weight:900;margin-bottom:16px;color:var(--text-primary)">
+          ${pct>=70?'أحسنت! تم التسليم':pct>=50?'جيد! تم التسليم':'تم التسليم'}
+        </div>
+        <div style="font-size:3rem;font-weight:900;margin-bottom:8px;color:${pct>=70?'var(--success)':pct>=50?'var(--warning)':'var(--accent)'}">
+          ${earnedScore.toFixed(1)} / ${totalScore.toFixed(1)}
+        </div>
+        <div style="font-size:1.2rem;color:var(--text-secondary);margin-bottom:20px">
+          النسبة: ${pct}%
+        </div>
+        ${hasEssay ? `<div style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);border-radius:10px;padding:14px 20px;margin:16px auto;max-width:480px;font-size:0.9rem;color:var(--warning)">
+          <i class="fas fa-clock"></i> 
+          <strong>ملاحظة:</strong> الأسئلة المقالية في انتظار التصحيح — الدرجة النهائية ستظهر بعد المراجعة
         </div>` : ''}
-        <div style="margin:20px auto;max-width:480px;text-align:right">
-          ${detail.filter(d=>d.type==='mcq').map((d,i) => {
-            const orig = qs.filter(q=>q.type!=='essay')[i]; // MCQ questions only
-            // need actual qi
-            return '';
-          }).join('')}
+        
+        <div style="margin:24px auto;max-width:640px;text-align:right">
+          <div style="font-size:0.95rem;font-weight:700;color:var(--accent);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+            <i class="fas fa-list-check"></i> إجاباتك:
+          </div>
           ${qs.map((q,qi) => {
             const d = detail[qi];
             if (d.type === 'essay') return `
-              <div style="padding:10px;margin-bottom:6px;border-radius:8px;background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.3)">
-                <div style="font-size:0.85rem"><strong>${qi+1}. </strong>${q.text}</div>
-                <div style="font-size:0.8rem;color:var(--warning);margin-top:4px">⏳ في انتظار التصحيح</div>
+              <div style="padding:12px;margin-bottom:8px;border-radius:8px;background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.3)">
+                <div style="font-size:0.88rem;margin-bottom:4px">
+                  <strong>${qi+1}. </strong>${q.text}
+                  <span class="badge badge-success" style="font-size:0.7rem;margin-right:6px">${d.grade} ${d.grade===1?'درجة':'درجات'}</span>
+                </div>
+                <div style="font-size:0.82rem;color:var(--warning);margin-top:6px;padding:8px;background:rgba(210,153,34,0.05);border-radius:4px">
+                  ⏳ في انتظار التصحيح
+                </div>
               </div>`;
-            return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:6px;border-radius:8px;background:${d.isRight?'var(--success-bg)':'var(--danger-bg)'};border:1px solid ${d.isRight?'var(--success)':'var(--danger)'}">
-              <span>${d.isRight?'✅':'❌'}</span>
-              <div style="flex:1;font-size:0.85rem">
-                <div><strong>${qi+1}. </strong>${q.text}</div>
-                ${!d.isRight ? `<div style="color:var(--success);font-size:0.8rem">الإجابة الصحيحة: ${(q.options||[])[d.correct]||'—'}</div>` : ''}
+            return `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px;margin-bottom:8px;border-radius:8px;background:${d.isRight?'rgba(63,185,80,0.08)':'rgba(248,81,73,0.08)'};border:1px solid ${d.isRight?'rgba(63,185,80,0.3)':'rgba(248,81,73,0.3)'}">
+              <span style="font-size:1.3rem;flex-shrink:0">${d.isRight?'✅':'❌'}</span>
+              <div style="flex:1;font-size:0.88rem">
+                <div style="margin-bottom:6px">
+                  <strong>${qi+1}. </strong>${q.text}
+                  <span class="badge ${d.isRight?'badge-success':'badge-danger'}" style="font-size:0.7rem;margin-right:6px">
+                    ${d.isRight?`+${d.grade}`:'0'} / ${d.grade} ${d.grade===1?'درجة':'درجات'}
+                  </span>
+                </div>
+                ${d.chosen >= 0 ? `<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:4px">
+                  <strong>إجابتك:</strong> ${(q.options||[])[d.chosen]||'—'}
+                </div>` : ''}
+                ${!d.isRight ? `<div style="color:var(--success);font-size:0.82rem;padding:6px 10px;background:rgba(63,185,80,0.1);border-radius:4px;margin-top:4px">
+                  <i class="fas fa-lightbulb"></i> <strong>الإجابة الصحيحة:</strong> ${(q.options||[])[d.correct]||'—'}
+                </div>` : ''}
               </div>
             </div>`;
           }).join('')}
         </div>
-        <button class="btn btn-secondary" onclick="loadStudentExams({id:'${studentId}',grade:'${ex.grade}',name:''})">
-          <i class="fas fa-arrow-right"></i> العودة
-        </button>
+        
+        <div style="margin-top:32px">
+          <button class="btn btn-primary" onclick="loadStudentExams({id:'${studentId}',grade:'${ex.grade}',name:''})">
+            <i class="fas fa-arrow-right"></i> العودة للامتحانات
+          </button>
+        </div>
       </div>`;
   }).catch(() => toast('خطأ في التسليم','error'));
 }
@@ -1996,15 +2023,21 @@ function renderExams() {
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div style="flex:1">
             <div style="font-size:1rem;font-weight:800;margin-bottom:6px">${ex.title}</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
               <span class="badge badge-accent" style="font-size:0.78rem">${ex.grade}</span>
               <span class="badge ${statusBadge[ex.status]||'badge-secondary'}">${statusLabel[ex.status]||ex.status}</span>
               <span style="font-size:0.8rem;color:var(--text-muted)">${(ex.questions||[]).length} سؤال</span>
+              ${ex.totalGrade ? `<span style="font-size:0.8rem;color:var(--success);font-weight:700"><i class="fas fa-star"></i> ${ex.totalGrade} درجة</span>` : ''}
               ${ex.duration ? `<span style="font-size:0.8rem;color:var(--text-muted)"><i class="fas fa-clock"></i> ${ex.duration} د</span>` : ''}
             </div>
+            ${ex.startTime || ex.endTime ? `<div style="font-size:0.78rem;color:var(--text-muted)">
+              ${ex.startTime ? `<i class="fas fa-play-circle" style="color:var(--success)"></i> يفتح: ${new Date(ex.startTime).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}` : ''}
+              ${ex.endTime ? ` <i class="fas fa-stop-circle" style="color:var(--danger);margin-right:8px"></i> يُغلق: ${new Date(ex.endTime).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}` : ''}
+            </div>` : ''}
           </div>
-          <div style="display:flex;gap:6px;flex-shrink:0">
-            <button class="btn btn-xs btn-secondary" onclick="viewExamResults('${ex.id}')" title="النتائج"><i class="fas fa-chart-bar"></i></button>
+          <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
+            <button class="btn btn-xs" style="background:rgba(124,92,252,0.15);color:var(--accent2);border:1px solid rgba(124,92,252,0.3)" onclick="previewExamAsTeacher('${ex.id}')" title="معاينة"><i class="fas fa-eye"></i> معاينة</button>
+            <button class="btn btn-xs btn-warning" onclick="viewExamResults('${ex.id}')" title="النتائج والتصحيح"><i class="fas fa-chart-bar"></i> النتائج</button>
             <button class="btn btn-xs btn-secondary" onclick="openEditExam('${ex.id}')" title="تعديل"><i class="fas fa-edit"></i></button>
             <button class="btn btn-xs btn-danger" onclick="deleteExam('${ex.id}')" title="حذف"><i class="fas fa-trash"></i></button>
           </div>
@@ -2048,23 +2081,60 @@ function openEditExam(id) {
 }
 
 function addQuestionRow(q) {
-  q = q || { text:'', type:'mcq', options:['','','',''], correct:0, essayAnswer:'', imageUrl:'' };
+  q = q || { text:'', type:'mcq', options:['','','',''], correct:0, essayAnswer:'', imageUrl:'', grade:1 };
   const qType   = q.type || 'mcq';
   const imgUrl  = q.imageUrl || '';
+  const qGrade  = q.grade || 1;
   const container = document.getElementById('questionsContainer');
   const idx = container.children.length;
   const div = document.createElement('div');
   div.className = 'q-row';
-  div.style.cssText = 'background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px';
+  div.draggable = true;
+  div.style.cssText = 'background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;cursor:move';
+  
+  // إضافة events للسحب والإفلات
+  div.ondragstart = function(e) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+    this.classList.add('dragging');
+    this.style.opacity = '0.4';
+  };
+  div.ondragend = function() {
+    this.classList.remove('dragging');
+    this.style.opacity = '1';
+  };
+  div.ondragover = function(e) {
+    e.preventDefault();
+    const dragging = document.querySelector('.dragging');
+    if (!dragging || dragging === this) return;
+    const rect = this.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    if (e.clientY < mid) {
+      this.parentNode.insertBefore(dragging, this);
+    } else {
+      this.parentNode.insertBefore(dragging, this.nextSibling);
+    }
+    renumberQuestions();
+  };
+  
   div.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <span style="font-weight:700;color:var(--accent);font-size:0.9rem">سؤال ${idx+1}</span>
       <div style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-grip-vertical" style="color:var(--text-muted);cursor:move" title="اسحب لإعادة الترتيب"></i>
+        <span style="font-weight:700;color:var(--accent);font-size:0.9rem">سؤال ${idx+1}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;background:var(--bg-input);padding:4px 10px;border-radius:6px;border:1px solid var(--border)">
+          <label style="font-size:0.8rem;color:var(--text-secondary);margin:0">الدرجة:</label>
+          <input type="number" class="form-control q-grade" min="0.5" max="100" step="0.5" value="${qGrade}"
+            style="width:60px;padding:4px 8px;font-size:0.85rem;text-align:center;font-weight:700"
+            oninput="updateTotalGrade()">
+        </div>
         <select class="form-control q-type" style="width:auto;font-size:0.82rem;padding:4px 8px" onchange="toggleQTypeFields(this)">
           <option value="mcq"   ${qType==='mcq'  ?'selected':''}>☑️ اختيار من متعدد</option>
           <option value="essay" ${qType==='essay'?'selected':''}>✏️ مقالي</option>
         </select>
-        <button class="btn btn-xs btn-danger" onclick="this.closest('.q-row').remove();renumberQuestions()"><i class="fas fa-trash"></i></button>
+        <button class="btn btn-xs btn-danger" onclick="this.closest('.q-row').remove();renumberQuestions();updateTotalGrade()"><i class="fas fa-trash"></i></button>
       </div>
     </div>
 
@@ -2123,6 +2193,7 @@ function addQuestionRow(q) {
       <div style="font-size:0.75rem;color:var(--warning);margin-top:6px"><i class="fas fa-exclamation-triangle"></i> الأسئلة المقالية تُصحَّح يدوياً</div>
     </div>`;
   container.appendChild(div);
+  updateTotalGrade();
 }
 
 // رفع صورة من الجهاز → base64
@@ -2191,6 +2262,30 @@ function renumberQuestions() {
   });
 }
 
+// حساب مجموع الدرجات
+function updateTotalGrade() {
+  const rows = document.querySelectorAll('.q-row');
+  let total = 0;
+  rows.forEach(row => {
+    const gradeInput = row.querySelector('.q-grade');
+    if (gradeInput) total += parseFloat(gradeInput.value) || 0;
+  });
+  
+  // عرض المجموع فوق الأسئلة
+  const container = document.getElementById('questionsContainer');
+  let totalDisplay = document.getElementById('totalGradeDisplay');
+  if (!totalDisplay) {
+    totalDisplay = document.createElement('div');
+    totalDisplay.id = 'totalGradeDisplay';
+    totalDisplay.style.cssText = 'background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-weight:700';
+    container.parentNode.insertBefore(totalDisplay, container);
+  }
+  totalDisplay.innerHTML = `
+    <span style="color:var(--text-secondary);font-size:0.9rem"><i class="fas fa-calculator" style="color:var(--success)"></i> مجموع الامتحان:</span>
+    <span style="font-size:1.2rem;color:var(--success)">${total.toFixed(1)} درجة</span>
+  `;
+}
+
 function saveExam() {
   const title    = document.getElementById('exTitle').value.trim();
   const grade    = document.getElementById('exGrade').value;
@@ -2205,11 +2300,15 @@ function saveExam() {
 
   const questions = [];
   let valid = true;
+  let totalGrade = 0;
   rows.forEach((row, qi) => {
     const text        = row.querySelector('.q-text')?.value.trim() || '';
     const qType       = row.querySelector('.q-type')?.value || 'mcq';
+    const qGrade      = parseFloat(row.querySelector('.q-grade')?.value) || 1;
     const opts        = [...row.querySelectorAll('.q-opt')].map(i => i.value.trim());
     const correct     = parseInt(row.querySelector('input[type=radio]:checked')?.value ?? 0);
+    
+    totalGrade += qGrade;
     const essayAnswer = row.querySelector('.q-essay-answer')?.value.trim() || '';
     let   imageUrl    = row.querySelector('.q-img-data')?.value || '';
 
@@ -2222,13 +2321,13 @@ function saveExam() {
       imageUrl = ''; // امسحها عشان ميفشلش الحفظ
     }
 
-    if (qType === 'mcq') questions.push({ text, type:'mcq', options: opts, correct, imageUrl });
-    else questions.push({ text, type:'essay', essayAnswer, imageUrl });
+    if (qType === 'mcq') questions.push({ text, type:'mcq', options: opts, correct, imageUrl, grade: qGrade });
+    else questions.push({ text, type:'essay', essayAnswer, imageUrl, grade: qGrade });
   });
   if (!valid) return;
 
   const id   = editId || db.ref('exams').push().key;
-  const data = { id, title, grade, duration, status, instructions: instr, questions,
+  const data = { id, title, grade, duration, status, instructions: instr, questions, totalGrade,
                  startTime:    document.getElementById('exStartTime').value || null,
                  endTime:      document.getElementById('exEndTime').value   || null,
                  gracePeriod:  parseInt(document.getElementById('exGracePeriod').value)||0,
@@ -5657,6 +5756,193 @@ if ('serviceWorker' in navigator) {
     }).catch(function(err) {
       console.log('SW registration failed:', err);
     });
+  });
+}
+</script>
+
+<script>
+// =============================================
+// تحسينات الامتحانات - منصة الأوربيتالي
+// =============================================
+
+// معاينة الامتحان للمعلم
+function previewExamAsTeacher(examId) {
+  const ex = examsData[examId];
+  if (!ex) { toast('الامتحان غير موجود','error'); return; }
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal modal-lg" style="max-width:900px;max-height:90vh;overflow-y:auto">
+      <div class="modal-header">
+        <span class="modal-title"><i class="fas fa-eye"></i> معاينة: ${ex.title}</span>
+        <button class="modal-close" onclick="this.closest('.modal-backdrop').remove()"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.25);border-radius:8px;padding:12px;margin-bottom:16px">
+        <div style="font-size:0.9rem;color:var(--text-secondary)">
+          <i class="fas fa-info-circle" style="color:var(--accent)"></i>
+          <strong>معاينة فقط</strong> — هذا ما سيراه الطالب
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px">
+          <i class="fas fa-graduation-cap"></i> ${ex.grade}
+          ${ex.duration ? ` · <i class="fas fa-clock"></i> ${ex.duration} دقيقة` : ''}
+          · <i class="fas fa-list-ol"></i> ${(ex.questions||[]).length} سؤال
+          ${ex.totalGrade ? ` · <i class="fas fa-star" style="color:var(--gold)"></i> ${ex.totalGrade} درجة` : ''}
+        </div>
+        ${ex.instructions ? `<div style="background:var(--bg-card2);padding:10px;border-radius:6px;font-size:0.88rem;color:var(--text-secondary)">${ex.instructions}</div>` : ''}
+      </div>
+      <div style="display:grid;gap:12px">
+        ${(ex.questions||[]).map((q,qi) => {
+          const isMcq = q.type !== 'essay';
+          const qGrade = q.grade || 1;
+          return `<div class="card" style="border-color:rgba(79,142,247,0.15)">
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
+                <span style="font-weight:800;color:var(--accent);font-size:0.95rem;flex-shrink:0">${qi+1}.</span>
+                <div style="flex:1">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                    <span style="font-size:0.95rem;font-weight:700">${q.text}</span>
+                    <span class="badge badge-success" style="font-size:0.72rem"><i class="fas fa-star"></i> ${qGrade} ${qGrade===1?'درجة':'درجات'}</span>
+                    ${!isMcq ? '<span class="badge badge-warning" style="font-size:0.72rem">✏️ مقالي</span>' : ''}
+                  </div>
+                  ${q.imageUrl ? `<div style="margin-bottom:12px"><img src="${q.imageUrl}" alt="صورة السؤال" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid var(--border);object-fit:contain"></div>` : ''}
+                  ${isMcq ? `<div style="display:grid;gap:8px;margin-top:10px">${(q.options||[]).map((opt,oi) => {
+                        const isCorrect = parseInt(q.correct) === oi;
+                        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;border:1px solid ${isCorrect?'var(--success)':'var(--border)'};background:${isCorrect?'rgba(63,185,80,0.08)':'transparent'}">
+                          <span style="width:24px;height:24px;border-radius:50%;border:2px solid ${isCorrect?'var(--success)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0;${isCorrect?'background:var(--success);color:#fff':''}">
+                            ${String.fromCharCode(65+oi)}
+                          </span>
+                          <span style="flex:1">${opt}</span>
+                          ${isCorrect ? '<i class="fas fa-check-circle" style="color:var(--success);font-size:1.1rem"></i>' : ''}
+                        </div>`;
+                      }).join('')}</div>` : `<div style="padding:10px 14px;background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;margin-top:10px">
+                      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px"><i class="fas fa-lightbulb" style="color:var(--warning)"></i> نموذج الإجابة:</div>
+                      <div style="font-size:0.88rem;color:var(--text-secondary)">${q.essayAnswer || '<em>لم يتم تحديد نموذج إجابة</em>'}</div>
+                    </div>`}
+                </div>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="this.closest('.modal-backdrop').remove()">إغلاق</button></div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// عرض النتائج وإعادة الفتح
+function viewExamResults(examId) {
+  const ex = examsData[examId];
+  if (!ex) { toast('الامتحان غير موجود','error'); return; }
+  db.ref('examResults').once('value', snap => {
+    const allResults = snap.val() || {};
+    const results = [];
+    Object.keys(allResults).forEach(studentId => {
+      const studentResults = allResults[studentId];
+      if (studentResults[examId]) {
+        const result = studentResults[examId];
+        const student = studentsData[studentId];
+        results.push({ studentId, studentName: student?.name || 'طالب محذوف', ...result });
+      }
+    });
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.style.display = 'flex';
+    modal.innerHTML = `<div class="modal modal-lg" style="max-width:1000px;max-height:90vh">
+        <div class="modal-header">
+          <span class="modal-title"><i class="fas fa-chart-bar"></i> نتائج: ${ex.title}</span>
+          <button class="modal-close" onclick="this.closest('.modal-backdrop').remove()"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.25);border-radius:8px;padding:12px;margin-bottom:16px">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between;align-items:center">
+            <div><div style="font-size:0.82rem;color:var(--text-secondary)">عدد الطلاب الذين حلّوا</div><div style="font-size:1.5rem;font-weight:800;color:var(--accent)">${results.length}</div></div>
+            <div><div style="font-size:0.82rem;color:var(--text-secondary)">المتوسط</div><div style="font-size:1.5rem;font-weight:800;color:var(--success)">${results.length ? (results.reduce((sum,r)=>sum+(r.score||0),0)/results.length).toFixed(1) : '0'} / ${ex.totalGrade || ((ex.questions||[]).reduce((sum,q)=>sum+(q.grade||1),0))}</div></div>
+          </div>
+        </div>
+        <div style="max-height:500px;overflow-y:auto">${results.length === 0 ? '<div class="empty-state"><i class="fas fa-clipboard"></i><p>لم يحل أحد الامتحان بعد</p></div>' : `<div class="table-wrap"><table><thead><tr><th>الطالب</th><th>الدرجة</th><th>النسبة</th><th>التاريخ</th><th>إجراءات</th></tr></thead><tbody>${results.sort((a,b)=>(b.score||0)-(a.score||0)).map(r => {
+                    const total = r.total || ex.totalGrade || 10;
+                    const percent = total > 0 ? ((r.score||0)/total*100).toFixed(1) : 0;
+                    return `<tr><td style="font-weight:700">${r.studentName}</td><td><span style="font-size:1.1rem;font-weight:800;color:var(--success)">${r.score||0}</span> / ${total}</td>
+                      <td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;background:var(--bg-card2);border-radius:20px;height:8px;overflow:hidden"><div style="width:${percent}%;background:linear-gradient(90deg,var(--success),var(--accent));height:100%"></div></div><span style="font-size:0.85rem;font-weight:700;color:var(--accent);min-width:45px">${percent}%</span></div></td>
+                      <td style="font-size:0.82rem;color:var(--text-muted)">${r.submittedAt ? new Date(r.submittedAt).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+                      <td><div style="display:flex;gap:4px"><button class="btn btn-xs btn-secondary" onclick="viewStudentAnswers('${examId}','${r.studentId}')" title="عرض الإجابات"><i class="fas fa-eye"></i> عرض</button><button class="btn btn-xs btn-warning" onclick="reopenExamForStudent('${examId}','${r.studentId}')" title="إعادة فتح الامتحان"><i class="fas fa-redo"></i> إعادة فتح</button></div></td></tr>`;
+                  }).join('')}</tbody></table></div>`}</div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="this.closest('.modal-backdrop').remove()">إغلاق</button></div>
+      </div>`;
+    document.body.appendChild(modal);
+  });
+}
+
+function reopenExamForStudent(examId, studentId) {
+  if (!confirm('هل تريد إعادة فتح الامتحان لهذا الطالب؟\nسيتمكن من حل الامتحان مرة أخرى وسيتم مسح نتيجته السابقة.')) return;
+  db.ref(`examResults/${studentId}/${examId}`).remove().then(() => {
+    toast('تم إعادة فتح الامتحان للطالب', 'success');
+    viewExamResults(examId);
+  }).catch(err => { console.error('Error reopening exam:', err); toast('خطأ في إعادة الفتح', 'error'); });
+}
+
+function viewStudentAnswers(examId, studentId) {
+  const ex = examsData[examId];
+  const student = studentsData[studentId];
+  db.ref(`examResults/${studentId}/${examId}`).once('value', snap => {
+    const result = snap.val();
+    if (!result) { toast('لا توجد نتيجة لهذا الطالب', 'error'); return; }
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.style.display = 'flex';
+    modal.innerHTML = `<div class="modal modal-lg" style="max-width:900px;max-height:90vh;overflow-y:auto">
+        <div class="modal-header"><span class="modal-title"><i class="fas fa-file-alt"></i> إجابات: ${student?.name || 'الطالب'}</span><button class="modal-close" onclick="this.closest('.modal-backdrop').remove()"><i class="fas fa-times"></i></button></div>
+        <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.25);border-radius:8px;padding:12px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+            <div><div style="font-size:0.9rem;font-weight:700">${ex.title}</div><div style="font-size:0.82rem;color:var(--text-secondary)">تم التسليم: ${result.submittedAt ? new Date(result.submittedAt).toLocaleString('ar-EG') : '—'}</div></div>
+            <div style="text-align:center"><div style="font-size:0.82rem;color:var(--text-secondary)">الدرجة</div><div style="font-size:1.8rem;font-weight:900;color:var(--success)">${result.score || 0} / ${result.total || ex.totalGrade || 10}</div></div>
+          </div>
+        </div>
+        <div style="display:grid;gap:12px">${(ex.questions||[]).map((q,qi) => {
+            const ans = result.answers?.[qi];
+            const isMcq = q.type !== 'essay';
+            const qGrade = q.grade || 1;
+            const isCorrect = isMcq && parseInt(ans) === parseInt(q.correct);
+            const correctAnswer = isMcq ? q.options[q.correct] : null;
+            const studentAnswer = isMcq ? (ans !== undefined ? q.options[ans] : 'لم يجب') : (ans || 'لم يجب');
+            return `<div class="card" style="border-color:${isCorrect ? 'var(--success)' : (ans !== undefined ? 'var(--danger)' : 'var(--border)')}">
+                <div style="display:flex;align-items:flex-start;gap:10px"><span style="font-weight:800;color:var(--accent);font-size:0.95rem;flex-shrink:0">${qi+1}.</span>
+                  <div style="flex:1">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                      <span style="font-size:0.95rem;font-weight:700">${q.text}</span>
+                      <span class="badge badge-success" style="font-size:0.72rem">${qGrade} ${qGrade === 1 ? 'درجة' : 'درجات'}</span>
+                      ${!isMcq ? '<span class="badge badge-warning" style="font-size:0.72rem">✏️ مقالي</span>' : ''}
+                    </div>
+                    ${q.imageUrl ? `<div style="margin-bottom:12px"><img src="${q.imageUrl}" alt="صورة السؤال" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border);object-fit:contain"></div>` : ''}
+                    ${isMcq ? `<div style="margin-top:10px">
+                        <div style="padding:10px 14px;background:${isCorrect?'rgba(63,185,80,0.1)':'rgba(248,81,73,0.1)'};border:1px solid ${isCorrect?'var(--success)':'var(--danger)'};border-radius:8px;margin-bottom:8px">
+                          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px"><i class="fas ${isCorrect?'fa-check-circle':'fa-times-circle'}" style="color:${isCorrect?'var(--success)':'var(--danger)'}"></i> إجابة الطالب:</div>
+                          <div style="font-size:0.9rem;font-weight:700">${studentAnswer}</div>
+                        </div>
+                        ${!isCorrect ? `<div style="padding:10px 14px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.3);border-radius:8px">
+                          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-lightbulb" style="color:var(--success)"></i> الإجابة الصحيحة:</div>
+                          <div style="font-size:0.9rem;font-weight:700;color:var(--success)">${correctAnswer}</div>
+                        </div>` : ''}
+                      </div>` : `<div style="margin-top:10px">
+                        <div style="padding:12px;background:var(--bg-card2);border:1px solid var(--border);border-radius:8px">
+                          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px"><i class="fas fa-pen"></i> إجابة الطالب:</div>
+                          <div style="font-size:0.88rem;white-space:pre-wrap">${studentAnswer}</div>
+                        </div>
+                        ${q.essayAnswer ? `<div style="padding:10px 14px;background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.25);border-radius:8px;margin-top:8px">
+                          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-lightbulb" style="color:var(--accent)"></i> نموذج الإجابة:</div>
+                          <div style="font-size:0.85rem;color:var(--text-secondary)">${q.essayAnswer}</div>
+                        </div>` : ''}
+                        <div style="margin-top:10px;padding:8px 12px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;font-size:0.82rem;color:var(--warning)">
+                          <i class="fas fa-info-circle"></i> هذا السؤال يحتاج تصحيح يدوي
+                        </div>
+                      </div>`}
+                  </div>
+                </div>
+              </div>`;
+          }).join('')}</div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="this.closest('.modal-backdrop').remove()">إغلاق</button></div>
+      </div>`;
+    document.body.appendChild(modal);
   });
 }
 </script>
