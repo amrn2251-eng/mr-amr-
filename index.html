@@ -1516,15 +1516,27 @@ function loadStudentExams(s) {
   // مسح أي interval سابق للتحديث التلقائي
   if (window._examListRefresh) clearInterval(window._examListRefresh);
 
-  db.ref('exams').once('value', snap => {
-    const all = snap.val() || {};
+  // تحميل الامتحانات والنتائج معاً
+  Promise.all([
+    db.ref('exams').once('value'),
+    db.ref(`examResults/${s.id}`).once('value')
+  ]).then(([examsSnap, resultsSnap]) => {
+    const all = examsSnap.val() || {};
+    const results = resultsSnap.val() || {};
     const now = Date.now();
+    
+    // الامتحانات اللي امتحنها الطالب (عشان نظهرها حتى لو خلصت)
+    const studentExamIds = Object.keys(results);
 
     // الامتحانات لهذه المرحلة: 
     // 1. المنشورة (active)
     // 2. المغلقة (closed) اللي معادها لسه مجاش (startTime في المستقبل)
+    // 3. أي امتحان الطالب امتحنه (حتى لو خلص)
     const exams = Object.values(all).filter(ex => {
       if (ex.grade !== s.grade) return false;
+      
+      // لو الطالب امتحنه، يظهر في كل الأحوال
+      if (studentExamIds.includes(ex.id)) return true;
       
       // لو منشور، يظهر
       if (ex.status === 'active') return true;
@@ -1538,7 +1550,7 @@ function loadStudentExams(s) {
       return false;
     });
 
-    // لو مافيش أي امتحانات أصلاً (لا مفتوحة ولا مجدولة)
+    // لو مافيش أي امتحانات أصلاً (لا مفتوحة ولا مجدولة ولا امتحنها)
     if (!exams.length) {
       container.innerHTML = `<div class="empty-state" style="margin-top:60px">
         <i class="fas fa-clipboard" style="font-size:3rem;color:var(--text-muted)"></i>
@@ -1547,28 +1559,33 @@ function loadStudentExams(s) {
       return;
     }
 
-    db.ref(`examResults/${s.id}`).once('value', rSnap => {
-      const results = rSnap.val() || {};
-      _renderExamList(container, s, exams, results);
-      // تحديث تلقائي كل 30 ثانية (للفتح والإغلاق التلقائي)
-      window._examListRefresh = setInterval(() => {
-        db.ref('exams').once('value', snap2 => {
-          const all2   = snap2.val() || {};
-          const exams2 = Object.values(all2).filter(ex => {
-            if (ex.grade !== s.grade) return false;
-            if (ex.status === 'active') return true;
-            if (ex.status === 'closed' && ex.startTime) {
-              const startMs = new Date(ex.startTime).getTime();
-              return startMs > Date.now();
-            }
-            return false;
-          });
-          db.ref(`examResults/${s.id}`).once('value', rSnap2 => {
-            _renderExamList(container, s, exams2, rSnap2.val()||{});
-          });
+    _renderExamList(container, s, exams, results);
+    
+    // تحديث تلقائي كل 30 ثانية (للفتح والإغلاق التلقائي)
+    window._examListRefresh = setInterval(() => {
+      Promise.all([
+        db.ref('exams').once('value'),
+        db.ref(`examResults/${s.id}`).once('value')
+      ]).then(([examsSnap2, resultsSnap2]) => {
+        const all2 = examsSnap2.val() || {};
+        const results2 = resultsSnap2.val() || {};
+        const studentExamIds2 = Object.keys(results2);
+        const now2 = Date.now();
+        
+        const exams2 = Object.values(all2).filter(ex => {
+          if (ex.grade !== s.grade) return false;
+          if (studentExamIds2.includes(ex.id)) return true;
+          if (ex.status === 'active') return true;
+          if (ex.status === 'closed' && ex.startTime) {
+            const startMs = new Date(ex.startTime).getTime();
+            return startMs > now2;
+          }
+          return false;
         });
-      }, 30000);
-    });
+        
+        _renderExamList(container, s, exams2, results2);
+      });
+    }, 30000);
   });
 }
 
@@ -1588,6 +1605,10 @@ function _renderExamList(container, s, exams, results) {
     // لو الامتحان "مغلق" (closed) ومعاده في المستقبل = قادم مع قفل
     if (ex.status === 'closed' && startMs && now < startMs) {
       upcoming.push(ex);
+    }
+    // لو الامتحان "مغلق" (closed) ومعاده عدى أو مافيش معاد = مغلق نهائياً
+    else if (ex.status === 'closed') {
+      closed.push(ex);
     }
     // لو الامتحان "منشور" (active)
     else if (ex.status === 'active') {
