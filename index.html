@@ -1516,70 +1516,35 @@ function loadStudentExams(s) {
   // مسح أي interval سابق للتحديث التلقائي
   if (window._examListRefresh) clearInterval(window._examListRefresh);
 
-  console.log('🔍 Loading exams for student:', s.name, '| Grade:', s.grade, '| ID:', s.id);
-
-  // تحميل الامتحانات والنتائج معاً
-  Promise.all([
-    db.ref('exams').once('value'),
-    db.ref(`examResults/${s.id}`).once('value')
-  ]).then(([examsSnap, resultsSnap]) => {
+  db.ref('exams').once('value', examsSnap => {
     const all = examsSnap.val() || {};
-    const results = resultsSnap.val() || {};
     const now = Date.now();
-    
-    console.log('📊 Firebase Data Loaded:');
-    console.log('  - Total exams in database:', Object.keys(all).length);
-    console.log('  - Student results found:', Object.keys(results).length);
-    console.log('  - All exams:', all);
-    console.log('  - Student results:', results);
-    
-    // الامتحانات اللي امتحنها الطالب (عشان نظهرها حتى لو خلصت)
-    const studentExamIds = Object.keys(results);
-    console.log('  - Exams student has taken:', studentExamIds);
 
-    // الامتحانات لهذه المرحلة: 
-    // 1. المنشورة (active)
-    // 2. المغلقة (closed) اللي معادها لسه مجاش (startTime في المستقبل)
-    // 3. أي امتحان الطالب امتحنه (حتى لو خلص)
-    const exams = Object.values(all).filter(ex => {
-      console.log(`  📝 Checking exam: ${ex.title} | Grade: ${ex.grade} | Status: ${ex.status}`);
-      
-      if (ex.grade !== s.grade) {
-        console.log(`    ❌ Grade mismatch: ${ex.grade} !== ${s.grade}`);
-        return false;
-      }
-      
-      // لو الطالب امتحنه، يظهر في كل الأحوال
-      if (studentExamIds.includes(ex.id)) {
-        console.log(`    ✅ Student has taken this exam - SHOW IT`);
-        return true;
-      }
-      
-      // لو منشور، يظهر
-      if (ex.status === 'active') {
-        console.log(`    ✅ Active exam - SHOW IT`);
-        return true;
-      }
-      
-      // لو مغلق (closed) ومعاه startTime في المستقبل، يظهر مع قفل
-      if (ex.status === 'closed' && ex.startTime) {
-        const startMs = new Date(ex.startTime).getTime();
-        if (startMs > now) {
-          console.log(`    ✅ Closed but scheduled for future - SHOW IT`);
-          return startMs > now; // يظهر لو معاده لسه مجاش
-        } else {
-          console.log(`    ❌ Closed and time passed - HIDE IT`);
+    // تحميل نتائج الطالب
+    db.ref(`examResults/${s.id}`).once('value', resultsSnap => {
+      const results = resultsSnap.val() || {};
+      const studentExamIds = Object.keys(results);
+
+      // الامتحانات لهذه المرحلة
+      const exams = Object.values(all).filter(ex => {
+        if (ex.grade !== s.grade) return false;
+        
+        // لو الطالب امتحنه، يظهر في كل الأحوال
+        if (studentExamIds.includes(ex.id)) return true;
+        
+        // لو منشور، يظهر
+        if (ex.status === 'active') return true;
+        
+        // لو مغلق ومعاه startTime في المستقبل، يظهر
+        if (ex.status === 'closed' && ex.startTime) {
+          const startMs = new Date(ex.startTime).getTime();
+          return startMs > now;
         }
-      }
-      
-      console.log(`    ❌ Doesn't match any criteria - HIDE IT`);
-      return false;
-    });
+        
+        return false;
+      });
 
-    console.log('✅ Final filtered exams to show:', exams.length);
-    console.log('Exams to display:', exams);
-
-    // لو مافيش أي امتحانات أصلاً (لا مفتوحة ولا مجدولة ولا امتحنها)
+    // لو مافيش أي امتحانات
     if (!exams.length) {
       container.innerHTML = `<div class="empty-state" style="margin-top:60px">
         <i class="fas fa-clipboard" style="font-size:3rem;color:var(--text-muted)"></i>
@@ -1590,31 +1555,32 @@ function loadStudentExams(s) {
 
     _renderExamList(container, s, exams, results);
     
-    // تحديث تلقائي كل 30 ثانية (للفتح والإغلاق التلقائي)
+    // تحديث تلقائي كل 30 ثانية
     window._examListRefresh = setInterval(() => {
-      Promise.all([
-        db.ref('exams').once('value'),
-        db.ref(`examResults/${s.id}`).once('value')
-      ]).then(([examsSnap2, resultsSnap2]) => {
+      db.ref('exams').once('value', examsSnap2 => {
         const all2 = examsSnap2.val() || {};
-        const results2 = resultsSnap2.val() || {};
-        const studentExamIds2 = Object.keys(results2);
         const now2 = Date.now();
         
-        const exams2 = Object.values(all2).filter(ex => {
-          if (ex.grade !== s.grade) return false;
-          if (studentExamIds2.includes(ex.id)) return true;
-          if (ex.status === 'active') return true;
-          if (ex.status === 'closed' && ex.startTime) {
-            const startMs = new Date(ex.startTime).getTime();
-            return startMs > now2;
-          }
-          return false;
+        db.ref(`examResults/${s.id}`).once('value', resultsSnap2 => {
+          const results2 = resultsSnap2.val() || {};
+          const studentExamIds2 = Object.keys(results2);
+          
+          const exams2 = Object.values(all2).filter(ex => {
+            if (ex.grade !== s.grade) return false;
+            if (studentExamIds2.includes(ex.id)) return true;
+            if (ex.status === 'active') return true;
+            if (ex.status === 'closed' && ex.startTime) {
+              const startMs = new Date(ex.startTime).getTime();
+              return startMs > now2;
+            }
+            return false;
+          });
+          
+          _renderExamList(container, s, exams2, results2);
         });
-        
-        _renderExamList(container, s, exams2, results2);
       });
     }, 30000);
+    });
   });
 }
 
@@ -5804,31 +5770,21 @@ function previewExamAsTeacher(examId) {
 
 // عرض النتائج وإعادة الفتح
 function viewExamResults(examId) {
-  console.log('🔍 Opening results for exam:', examId);
   const ex = examsData[examId];
-  if (!ex) { 
-    console.error('❌ Exam not found in examsData:', examId);
-    toast('الامتحان غير موجود','error'); 
-    return; 
-  }
-  console.log('📝 Exam found:', ex.title);
+  if (!ex) { toast('الامتحان غير موجود','error'); return; }
   
   db.ref('examResults').once('value', snap => {
     const allResults = snap.val() || {};
-    console.log('📊 All exam results from Firebase:', allResults);
-    
     const results = [];
+    
     Object.keys(allResults).forEach(studentId => {
       const studentResults = allResults[studentId];
       if (studentResults[examId]) {
         const result = studentResults[examId];
         const student = studentsData[studentId];
-        console.log(`  ✅ Found result for student: ${student?.name || studentId}`, result);
         results.push({ studentId, studentName: student?.name || 'طالب محذوف', ...result });
       }
     });
-    
-    console.log('✅ Total results found:', results.length);
     
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop';
