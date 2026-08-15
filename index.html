@@ -1525,9 +1525,16 @@ function loadStudentExams(s) {
       const results = resultsSnap.val() || {};
       const studentExamIds = Object.keys(results);
 
+      // normalize المرحلة (إزالة مسافات زيادة وتوحيد النص)
+      const normalizeGrade = (grade) => (grade || '').trim().replace(/\s+/g, ' ');
+      const studentGrade = normalizeGrade(s.grade);
+
       // الامتحانات لهذه المرحلة
       const exams = Object.values(all).filter(ex => {
-        if (ex.grade !== s.grade) return false;
+        const examGrade = normalizeGrade(ex.grade);
+        
+        // مقارنة المراحل بعد التنظيف
+        if (examGrade !== studentGrade) return false;
         
         // لو الطالب امتحنه، يظهر في كل الأحوال
         if (studentExamIds.includes(ex.id)) return true;
@@ -1543,6 +1550,19 @@ function loadStudentExams(s) {
         
         return false;
       });
+
+      // DEBUG: طباعة مؤقتة للتشخيص
+      if (exams.length === 0) {
+        console.warn('⚠️ No exams found for student!');
+        console.log('Student:', s.name, '| Grade:', studentGrade, '| ID:', s.id);
+        console.log('Student exam IDs:', studentExamIds);
+        console.log('All exams:', Object.values(all).map(ex => ({
+          title: ex.title,
+          grade: normalizeGrade(ex.grade),
+          status: ex.status,
+          id: ex.id
+        })));
+      }
 
     // لو مافيش أي امتحانات
     if (!exams.length) {
@@ -1564,9 +1584,11 @@ function loadStudentExams(s) {
         db.ref(`examResults/${s.id}`).once('value', resultsSnap2 => {
           const results2 = resultsSnap2.val() || {};
           const studentExamIds2 = Object.keys(results2);
+          const studentGrade2 = normalizeGrade(s.grade);
           
           const exams2 = Object.values(all2).filter(ex => {
-            if (ex.grade !== s.grade) return false;
+            const examGrade2 = normalizeGrade(ex.grade);
+            if (examGrade2 !== studentGrade2) return false;
             if (studentExamIds2.includes(ex.id)) return true;
             if (ex.status === 'active') return true;
             if (ex.status === 'closed' && ex.startTime) {
