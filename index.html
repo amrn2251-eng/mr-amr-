@@ -258,9 +258,10 @@
             <div>
               <div style="font-weight:800;color:var(--accent);font-size:1rem;margin-bottom:4px">
                 <i class="fas fa-sliders-h"></i> إعدادات درجات الامتحانات
+                <span id="examSettingsGradeLabel" style="color:var(--success);margin-right:8px"></span>
               </div>
               <div style="font-size:0.75rem;color:var(--text-muted)">
-                <i class="fas fa-info-circle"></i> حدد الدرجة القصوى لكل امتحان — المجموع سيُحسب تلقائياً
+                <i class="fas fa-info-circle"></i> حدد الدرجة القصوى لكل امتحان — كل مرحلة لها إعدادات مُستقلة
               </div>
             </div>
             <button class="btn btn-sm btn-primary" onclick="saveExamMaxScores()" id="saveExamMaxBtn">
@@ -3902,13 +3903,9 @@ function renderHonorRoll() {
   const container = document.getElementById('honorContent');
   if (!container) return;
   
-  // تحميل إعدادات الامتحانات لهذا الشهر لمعرفة المجموع الكلي
-  db.ref(`monthData/${monthKey}/_examMaxScores`).once('value', maxScoresSnap => {
-    const examMaxScores = maxScoresSnap.val() || {};
-    let maxTotal = 0;
-    for (let i = 1; i <= 8; i++) {
-      maxTotal += examMaxScores[`e${i}`] || 10;
-    }
+  // تحميل إعدادات الامتحانات لجميع المراحل
+  db.ref(`monthData/${monthKey}/_examMaxScores`).once('value', allScoresSnap => {
+    const allExamMaxScores = allScoresSnap.val() || {};
     
     const ranks = computeRanksForMonth(monthKey);
     const monthLabel = formatMonthLabel(monthKey);
@@ -3917,6 +3914,13 @@ function renderHonorRoll() {
     let html = `<div style="text-align:center;color:var(--text-secondary);font-size:0.9rem;margin-bottom:16px">أفضل 3 طلاب لكل مرحلة — ${monthLabel}</div>`;
     html += '<div class="honor-grid">';
     GRADES.forEach(grade => {
+      // حساب المجموع الكلي لهذه المرحلة
+      const examMaxScores = allExamMaxScores[grade] || {};
+      let maxTotal = 0;
+      for (let i = 1; i <= 8; i++) {
+        maxTotal += examMaxScores[`e${i}`] || 10;
+      }
+      
       const all = ranks[grade] || [];
       const top3 = all.slice(0, 3);
       html += `<div class="honor-card">
@@ -4006,7 +4010,7 @@ function buildAttRow(s) {
     sessCells += `<td><button class="sess-btn ${v===true?'present':v===false?'absent':''}" onclick="toggleSession('${s.id}',${i})">${i}</button></td>`;
   }
   
-  // حساب المجموع الفعلي بناءً على الدرجات المُحددة
+  // حساب المجموع الفعلي بناءً على الدرجات المُحددة (استخدام الإعدادات المُحملة)
   let totalScore = 0;
   let totalMax = 0;
   const examMaxScores = window._examMaxScores || {};
@@ -4027,7 +4031,7 @@ function buildAttRow(s) {
   
   // عرض المجموع في العمود الخاص بالدرجات
   const scoreCell = totalMax > 0 
-    ? `<div style="display:flex;align-items:center;justify-content:center;gap:4px">
+    ? `<div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:6px">
          <span style="font-weight:800;font-size:1.05rem;color:var(--success)">${totalScore.toFixed(1)}</span>
          <span style="font-size:0.8rem;color:var(--text-muted)">/</span>
          <span style="font-size:0.9rem;color:var(--text-muted)">${totalMax}</span>
@@ -4074,14 +4078,25 @@ function saveExamScore(studentId, examNum, val) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// إدارة الدرجات القصوى للامتحانات
+// إدارة الدرجات القصوى للامتحانات (لكل مرحلة)
 // ═══════════════════════════════════════════════════════════
 function renderExamMaxScores() {
   const container = document.getElementById('examMaxScoresContainer');
+  const gradeLabel = document.getElementById('examSettingsGradeLabel');
   if (!container) return;
   
-  // تحميل الدرجات القصوى من Firebase (تحت monthData/_settings)
-  db.ref(`monthData/${currentMonth}/_examMaxScores`).once('value', snap => {
+  const grade = document.getElementById('attGradeFilter')?.value || '';
+  if (!grade) {
+    container.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-muted);font-size:0.85rem">اختر الصف أولاً</div>';
+    if (gradeLabel) gradeLabel.textContent = '';
+    return;
+  }
+  
+  // تحديث اسم المرحلة في العنوان
+  if (gradeLabel) gradeLabel.textContent = `— ${grade}`;
+  
+  // تحميل الدرجات القصوى من Firebase (لكل مرحلة)
+  db.ref(`monthData/${currentMonth}/_examMaxScores/${grade}`).once('value', snap => {
     const scores = snap.val() || {};
     window._examMaxScores = scores;
     
@@ -4115,6 +4130,12 @@ function onExamMaxScoreChange() {
 }
 
 function saveExamMaxScores() {
+  const grade = document.getElementById('attGradeFilter')?.value || '';
+  if (!grade) {
+    toast('اختر الصف أولاً', 'error');
+    return;
+  }
+  
   const inputs = document.querySelectorAll('.exam-max-score');
   const scores = {};
   let valid = true;
@@ -4135,10 +4156,10 @@ function saveExamMaxScores() {
   // إظهار رسالة انتظار
   toast('جاري الحفظ...', 'info');
   
-  // حفظ في Firebase تحت monthData/_examMaxScores
-  db.ref(`monthData/${currentMonth}/_examMaxScores`).set(scores).then(() => {
+  // حفظ في Firebase تحت monthData/_examMaxScores/{grade}
+  db.ref(`monthData/${currentMonth}/_examMaxScores/${grade}`).set(scores).then(() => {
     window._examMaxScores = scores;
-    toast('✅ تم حفظ إعدادات الامتحانات بنجاح', 'success');
+    toast(`✅ تم حفظ إعدادات امتحانات ${grade} بنجاح`, 'success');
     const saveBtn = document.getElementById('saveExamMaxBtn');
     if (saveBtn) {
       saveBtn.style.animation = '';
@@ -4151,7 +4172,7 @@ function saveExamMaxScores() {
     console.error('Error details:', {
       code: err.code,
       message: err.message,
-      path: `monthData/${currentMonth}/_examMaxScores`,
+      path: `monthData/${currentMonth}/_examMaxScores/${grade}`,
       data: scores
     });
     
