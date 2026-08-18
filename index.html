@@ -1015,6 +1015,14 @@
       <textarea id="exInstructions" class="form-control" rows="2" placeholder="اكتب التعليمات هنا..."></textarea>
     </div>
     <hr style="border-color:var(--border);margin:16px 0">
+    <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.25);border-radius:8px;padding:12px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <i class="fas fa-info-circle" style="color:var(--accent);font-size:1.1rem;margin-top:2px"></i>
+        <div style="font-size:0.88rem;color:var(--text-primary)">
+          <strong style="color:var(--accent)">ملاحظة:</strong> كل سؤال له درجة مخصصة — حدد الدرجة لكل سؤال والنظام سيحسب المجموع الكلي تلقائياً
+        </div>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <span style="font-weight:700;color:var(--accent)"><i class="fas fa-list-ol"></i> الأسئلة</span>
       <button class="btn btn-sm btn-secondary" onclick="addQuestionRow()"><i class="fas fa-plus"></i> إضافة سؤال</button>
@@ -2235,11 +2243,13 @@ function addQuestionRow(q) {
         <span style="font-weight:700;color:var(--accent);font-size:0.9rem">سؤال ${idx+1}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px;background:var(--bg-input);padding:4px 10px;border-radius:6px;border:1px solid var(--border)">
-          <label style="font-size:0.8rem;color:var(--text-secondary);margin:0">الدرجة:</label>
+        <div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg, rgba(63,185,80,0.1), rgba(79,142,247,0.08));padding:6px 12px;border-radius:8px;border:2px solid rgba(63,185,80,0.3)">
+          <i class="fas fa-star" style="color:var(--gold);font-size:0.9rem"></i>
+          <label style="font-size:0.85rem;color:var(--text-primary);margin:0;font-weight:600">الدرجة:</label>
           <input type="number" class="form-control q-grade" min="0.5" max="100" step="0.5" value="${qGrade}"
-            style="width:60px;padding:4px 8px;font-size:0.85rem;text-align:center;font-weight:700"
-            oninput="updateTotalGrade()">
+            style="width:65px;padding:5px 8px;font-size:0.9rem;text-align:center;font-weight:800;border:1px solid rgba(63,185,80,0.4);background:white"
+            oninput="updateTotalGrade()"
+            title="حدد درجة السؤال">
         </div>
         <select class="form-control q-type" style="width:auto;font-size:0.82rem;padding:4px 8px" onchange="toggleQTypeFields(this)">
           <option value="mcq"   ${qType==='mcq'  ?'selected':''}>☑️ اختيار من متعدد</option>
@@ -2403,18 +2413,24 @@ function updateTotalGrade() {
     if (gradeInput) total += parseFloat(gradeInput.value) || 0;
   });
   
-  // عرض المجموع فوق الأسئلة
+  // عرض المجموع فوق الأسئلة بشكل أكثر وضوحاً
   const container = document.getElementById('questionsContainer');
   let totalDisplay = document.getElementById('totalGradeDisplay');
   if (!totalDisplay) {
     totalDisplay = document.createElement('div');
     totalDisplay.id = 'totalGradeDisplay';
-    totalDisplay.style.cssText = 'background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-weight:700';
+    totalDisplay.style.cssText = 'background:linear-gradient(135deg, rgba(63,185,80,0.15), rgba(79,142,247,0.12));border:2px solid rgba(63,185,80,0.4);border-radius:12px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;font-weight:700;box-shadow:0 2px 8px rgba(63,185,80,0.15)';
     container.parentNode.insertBefore(totalDisplay, container);
   }
   totalDisplay.innerHTML = `
-    <span style="color:var(--text-secondary);font-size:0.9rem"><i class="fas fa-calculator" style="color:var(--success)"></i> مجموع الامتحان:</span>
-    <span style="font-size:1.2rem;color:var(--success)">${total.toFixed(1)} درجة</span>
+    <span style="color:var(--text-primary);font-size:1rem;display:flex;align-items:center;gap:8px">
+      <i class="fas fa-calculator" style="color:var(--success);font-size:1.2rem"></i> 
+      <strong>مجموع درجات الامتحان:</strong>
+    </span>
+    <span style="font-size:1.6rem;color:var(--success);font-weight:900;display:flex;align-items:center;gap:6px">
+      <i class="fas fa-star" style="color:var(--gold);font-size:1.3rem"></i>
+      ${total.toFixed(1)} درجة
+    </span>
   `;
 }
 
