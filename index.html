@@ -253,20 +253,22 @@
       </div>
       <div class="card" style="padding:0">
         <!-- إعدادات الامتحانات -->
-        <div style="padding:14px 18px;background:var(--bg-card2);border-bottom:1px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <span style="font-weight:700;color:var(--accent);font-size:0.9rem">
-              <i class="fas fa-cog"></i> إعدادات الامتحانات الشهرية
-            </span>
-            <button class="btn btn-xs btn-primary" onclick="saveExamMaxScores()" style="display:none" id="saveExamMaxBtn">
-              <i class="fas fa-save"></i> حفظ
+        <div style="padding:16px 20px;background:linear-gradient(135deg, rgba(79,142,247,0.08), rgba(63,185,80,0.05));border-bottom:2px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div>
+              <div style="font-weight:800;color:var(--accent);font-size:1rem;margin-bottom:4px">
+                <i class="fas fa-sliders-h"></i> إعدادات درجات الامتحانات
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">
+                <i class="fas fa-info-circle"></i> حدد الدرجة القصوى لكل امتحان — المجموع سيُحسب تلقائياً
+              </div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="saveExamMaxScores()" id="saveExamMaxBtn">
+              <i class="fas fa-save"></i> حفظ الإعدادات
             </button>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:8px" id="examMaxScoresContainer">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px" id="examMaxScoresContainer">
             <!-- سيتم ملؤه ديناميكياً -->
-          </div>
-          <div style="font-size:0.75rem;color:var(--text-muted)">
-            <i class="fas fa-info-circle"></i> حدد الدرجة القصوى لكل امتحان — المجموع سيُحسب تلقائياً
           </div>
         </div>
         <div class="table-wrap">
@@ -4086,12 +4088,16 @@ function renderExamMaxScores() {
     let html = '';
     for (let i = 1; i <= 8; i++) {
       const score = scores[`e${i}`] || 10;
-      html += `<div style="display:flex;align-items:center;gap:6px;background:var(--bg-input);padding:6px 8px;border-radius:6px;border:1px solid var(--border)">
-        <label style="font-size:0.8rem;color:var(--text-secondary);margin:0;font-weight:600">ا${i}:</label>
+      html += `<div style="display:flex;flex-direction:column;gap:4px;background:white;padding:10px;border-radius:8px;border:2px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <label style="font-size:0.85rem;color:var(--text-secondary);margin:0;font-weight:700;text-align:center">
+          <i class="fas fa-file-alt" style="color:var(--accent)"></i> امتحان ${i}
+        </label>
         <input type="number" class="form-control exam-max-score" data-exam="${i}" min="0.5" max="100" step="0.5" value="${score}"
-          style="width:50px;padding:3px 6px;font-size:0.85rem;text-align:center;font-weight:700"
+          style="width:100%;padding:8px;font-size:1rem;text-align:center;font-weight:800;border:2px solid var(--accent);background:var(--bg-input)"
           oninput="onExamMaxScoreChange()"
+          placeholder="10"
           title="الدرجة القصوى للامتحان ${i}">
+        <div style="font-size:0.7rem;color:var(--text-muted);text-align:center">من ${score} درجة</div>
       </div>`;
     }
     
@@ -4100,9 +4106,12 @@ function renderExamMaxScores() {
 }
 
 function onExamMaxScoreChange() {
-  // إظهار زر الحفظ
+  // تغيير لون زر الحفظ لتنبيه المستخدم
   const saveBtn = document.getElementById('saveExamMaxBtn');
-  if (saveBtn) saveBtn.style.display = 'inline-flex';
+  if (saveBtn) {
+    saveBtn.style.animation = 'pulse 1s infinite';
+    saveBtn.style.background = 'var(--warning)';
+  }
 }
 
 function saveExamMaxScores() {
@@ -4127,7 +4136,11 @@ function saveExamMaxScores() {
   db.ref(`examMaxScores/${currentMonth}`).set(scores).then(() => {
     window._examMaxScores = scores;
     toast('تم حفظ إعدادات الامتحانات', 'success');
-    document.getElementById('saveExamMaxBtn').style.display = 'none';
+    const saveBtn = document.getElementById('saveExamMaxBtn');
+    if (saveBtn) {
+      saveBtn.style.animation = '';
+      saveBtn.style.background = '';
+    }
     // إعادة رسم الجدول
     renderAttendanceTable();
   }).catch(err => {
