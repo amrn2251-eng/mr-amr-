@@ -4528,7 +4528,7 @@ function renderReports() {
             <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px">${s.customCode||'-'}</code></td>
             <td><span class="badge badge-info">حصة ${sessionNum}</span></td>
             <td>${status ? '<span class="badge badge-success">✅ حاضر</span>' : '<span class="badge badge-danger">❌ غائب</span>'}</td>
-            <td>${status ? (score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/10</strong>` : '<span style="color:var(--warning)">لم تُسجل</span>') : '—'}</td>
+            <td>${status ? (score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/${(window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade] && window._examMaxScoresByGrade[s.grade][`e${lastSessionIdx}`]) || 10}</strong>` : '<span style="color:var(--warning)">لم تُسجل</span>') : '—'}</td>
             <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendDailyReport('${s.id}')"><i class="fab fa-whatsapp"></i> إرسال</button></td>
           </tr>`;
         }).join('')}</tbody>
@@ -4736,6 +4736,10 @@ function sendDailyReport(studentId) {
 
   if (!targetSession) { toast('لا يوجد حضور أو غياب مسجل لهذا الطالب','warning'); return; }
 
+  // الحصول على الدرجة القصوى لهذا الامتحان حسب المرحلة
+  const gradeMaxScores = (window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade]) || {};
+  const maxScore = gradeMaxScores[`e${targetSession}`] || 10;
+  
   // الدرجة تتبع رقم الحصة (حصة 3 → درجة اختبار 3)
   const score     = exams[`e${targetSession}`];
   const scoreText = (score != null && score !== '') ? `${score}` : 'لم يُسجل بعد';
@@ -4754,7 +4758,7 @@ function sendDailyReport(studentId) {
 
   let msg = '';
   if (targetStatus === true) {
-    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *${lbl.present} ومتابع بالكامل ✅* — حصة ${targetSession}\n• درجة اختبار حصة ${targetSession}: *${scoreText} / 10*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *${lbl.present} ومتابع بالكامل ✅* — حصة ${targetSession}\n• درجة اختبار حصة ${targetSession}: *${scoreText} / ${maxScore}*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
   } else {
     msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *إشعار غياب*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *❌ غائب — الحصة ${targetSession}*\n\n⚠️ يُرجى الاهتمام بانتظام حضور ${lbl.student} — الغياب يؤثر على ${s.gender === 'female' ? 'مستواها' : 'مستواه'} بشكل مباشر.\n\nلمعرفة المادة الفائتة تواصل مع المستر 📩`;
   }
@@ -4782,12 +4786,19 @@ function sendMonthlyReport(studentId) {
   const rankIdx = gradeRanks.findIndex(r => r.id === studentId);
   const rankTxt = getRankText(rankIdx, s.grade, true, s);
   const attendance = countAttendance(md);
+  
+  // الحصول على إعدادات الدرجات لهذه المرحلة
+  const gradeMaxScores = (window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade]) || {};
+  
   let scoreLines = '';
   let totalSum = 0;
+  let totalMax = 0;
   for (let i = 1; i <= 8; i++) {
     const v = exams[`e${i}`];
+    const maxScore = gradeMaxScores[`e${i}`] || 10;
+    totalMax += maxScore;
     const display = v!=null&&v!=='' ? v : 'لم يُسجل';
-    const maxLabel = i < 8 ? ' / 10' : '';
+    const maxLabel = ` / ${maxScore}`;
     scoreLines += `\n• اختبار ${i}: *${display}${maxLabel}*`;
     if (v!=null&&v!=='') totalSum += parseFloat(v)||0;
   }
@@ -4805,7 +4816,7 @@ function sendMonthlyReport(studentId) {
     }
   }
 
-  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📊 *حصاد التقرير الشامل لشهر ${formatMonthLabel(currentMonth)}*  📊\n• ${studentLabel(s).student}: *${s.name}*\n• ترتيب ${studentLabel(s).student} في المرحلة: *${rankTxt}*\n----------------------------------------\n📈 *سجل درجات الاختبارات بالتفصيل*:${scoreLines}\n• المجموع الكلي: *${totalSum}*\n• إجمالي حضور الشهر: *${attendance} / 8 حصص*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+  const msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📊 *حصاد التقرير الشامل لشهر ${formatMonthLabel(currentMonth)}*  📊\n• ${studentLabel(s).student}: *${s.name}*\n• ترتيب ${studentLabel(s).student} في المرحلة: *${rankTxt}*\n----------------------------------------\n📈 *سجل درجات الاختبارات بالتفصيل*:${scoreLines}\n• المجموع الكلي: *${totalSum} / ${totalMax}*\n• إجمالي حضور الشهر: *${attendance} / 8 حصص*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
   openWA(s.phone, msg);
   db.ref(`monthData/${currentMonth}/${studentId}/reportsSent/monthly`).set(true);
   toast('تم فتح واتساب للتقرير الشهري','success');
