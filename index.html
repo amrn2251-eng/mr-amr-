@@ -4571,11 +4571,19 @@ function renderReports() {
           const md = monthData[s.id] || {};
           const att = countAttendance(md);
           const score = calcTotalScore(md);
+          
+          // حساب المجموع الكلي من إعدادات الدرجات
+          const gradeSettings = window._examMaxScoresByGrade?.[s.grade] || {};
+          let totalMax = 0;
+          for (let i = 1; i <= 8; i++) {
+            totalMax += gradeSettings[`e${i}`] || 10;
+          }
+          
           return `<tr>
             <td><strong>${s.name}</strong></td>
             <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
             <td>${att}/8</td>
-            <td>${score}/80</td>
+            <td>${score}/${totalMax}</td>
             <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendMonthlyReport('${s.id}')"><i class="fab fa-whatsapp"></i> إرسال</button></td>
           </tr>`;
         }).join('')}</tbody>
