@@ -4486,55 +4486,65 @@ function renderReports() {
   const grade = document.getElementById('rptGradeFilter')?.value || '';
   const container = document.getElementById('reportContent');
   if (!container) return;
-  let rows = Object.values(students);
-  // فلتر حسب نوع المساعد
-  rows = _filterByAssistantType(rows);
-  if (grade) rows = rows.filter(s => s.grade === grade);
-  rows.sort((a,b) => (a.name||'').localeCompare(b.name||'','ar'));
-  if (currentReportTab === 'daily') {
-    // التقارير اليومية المعلقة = حصة سُجِّل فيها حضور/غياب ولم يُرسل تقريرها بعد
-    const pending = [];
-    rows.forEach(s => {
-      if (s.phone === 'none') return;
-      if ((s.status||'active') === 'left') return;          // تجاهل من غادر
-      const md   = monthData[s.id] || {};
-      const sess = md.sessions || {};
-      const rep  = md.reportsSent || {};
-      // ابحث من آخر حصة — حضور أو غياب بدون تقرير مُرسل
-      for (let i = 8; i >= 1; i--) {
-        const v = sess[`s${i}`];
-        if ((v === true || v === false) && !rep[`daily_s${i}`]) {
-          pending.push({ s, sessionNum: i, status: v, md });
-          break;
+  
+  // تحميل إعدادات الدرجات لجميع المراحل
+  db.ref(`monthData/${currentMonth}/_examMaxScores`).once('value', allScoresSnap => {
+    window._examMaxScoresByGrade = allScoresSnap.val() || {};
+    console.log('📊 Loaded exam max scores:', window._examMaxScoresByGrade);
+    
+    let rows = Object.values(students);
+    // فلتر حسب نوع المساعد
+    rows = _filterByAssistantType(rows);
+    if (grade) rows = rows.filter(s => s.grade === grade);
+    rows.sort((a,b) => (a.name||'').localeCompare(b.name||'','ar'));
+    
+    if (currentReportTab === 'daily') {
+      // التقارير اليومية المعلقة = حصة سُجِّل فيها حضور/غياب ولم يُرسل تقريرها بعد
+      const pending = [];
+      rows.forEach(s => {
+        if (s.phone === 'none') return;
+        if ((s.status||'active') === 'left') return;          // تجاهل من غادر
+        const md   = monthData[s.id] || {};
+        const sess = md.sessions || {};
+        const rep  = md.reportsSent || {};
+        // ابحث من آخر حصة — حضور أو غياب بدون تقرير مُرسل
+        for (let i = 8; i >= 1; i--) {
+          const v = sess[`s${i}`];
+          if ((v === true || v === false) && !rep[`daily_s${i}`]) {
+            pending.push({ s, sessionNum: i, status: v, md });
+            break;
+          }
         }
+      });
+      if (!pending.length) {
+        container.innerHTML = `<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success)"></i><p>لا توجد تقارير يومية معلقة 🎉</p></div>`;
+        return;
       }
-    });
-    if (!pending.length) {
-      container.innerHTML = `<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success)"></i><p>لا توجد تقارير يومية معلقة 🎉</p></div>`;
-      return;
-    }
-    container.innerHTML = `<div class="card" style="padding:0">
-      <div class="card-header" style="padding:14px 18px">
-        <span class="card-title">تقارير يومية معلقة</span>
-        <span class="badge badge-warning">${pending.length}</span>
-      </div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>الاسم</th><th>الصف</th><th>الكود</th><th>الحصة</th><th>الحالة</th><th>الدرجة</th><th>إرسال</th></tr></thead>
-        <tbody>${pending.map(({s, sessionNum, status, md}) => {
-          const score = md.exams?.[`e${sessionNum}`];
-          return `<tr>
-            <td><strong>${s.name}</strong></td>
-            <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
-            <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px">${s.customCode||'-'}</code></td>
-            <td><span class="badge badge-info">حصة ${sessionNum}</span></td>
-            <td>${status ? '<span class="badge badge-success">✅ حاضر</span>' : '<span class="badge badge-danger">❌ غائب</span>'}</td>
-            <td>${status ? (score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/${(window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade] && window._examMaxScoresByGrade[s.grade][`e${lastSessionIdx}`]) || 10}</strong>` : '<span style="color:var(--warning)">لم تُسجل</span>') : '—'}</td>
-            <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendDailyReport('${s.id}')"><i class="fab fa-whatsapp"></i> إرسال</button></td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>`;
-  } else if (currentReportTab === 'monthly') {
+      container.innerHTML = `<div class="card" style="padding:0">
+        <div class="card-header" style="padding:14px 18px">
+          <span class="card-title">تقارير يومية معلقة</span>
+          <span class="badge badge-warning">${pending.length}</span>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الاسم</th><th>الصف</th><th>الكود</th><th>الحصة</th><th>الحالة</th><th>الدرجة</th><th>إرسال</th></tr></thead>
+          <tbody>${pending.map(({s, sessionNum, status, md}) => {
+            const score = md.exams?.[`e${sessionNum}`];
+            const gradeSettings = window._examMaxScoresByGrade?.[s.grade] || {};
+            const maxScore = gradeSettings[`e${sessionNum}`] || 10;
+            console.log(`Student: ${s.name}, Grade: ${s.grade}, Session: ${sessionNum}, MaxScore: ${maxScore}, Settings:`, gradeSettings);
+            return `<tr>
+              <td><strong>${s.name}</strong></td>
+              <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
+              <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px">${s.customCode||'-'}</code></td>
+              <td><span class="badge badge-info">حصة ${sessionNum}</span></td>
+              <td>${status ? '<span class="badge badge-success">✅ حاضر</span>' : '<span class="badge badge-danger">❌ غائب</span>'}</td>
+              <td>${status ? (score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/${maxScore}</strong>` : '<span style="color:var(--warning)">لم تُسجل</span>') : '—'}</td>
+              <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendDailyReport('${s.id}')"><i class="fab fa-whatsapp"></i> إرسال</button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>`;
+    } else if (currentReportTab === 'monthly') {
     const pending = rows.filter(s => {
       if (s.phone === 'none') return false;
       const md = monthData[s.id] || {};
