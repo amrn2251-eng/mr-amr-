@@ -4229,7 +4229,10 @@ function saveExamMaxScores() {
   
   // حفظ في Firebase تحت monthData/_examMaxScores/{grade}
   db.ref(`monthData/${currentMonth}/_examMaxScores/${grade}`).set(scores).then(() => {
-    window._examMaxScores = scores;
+    // تحديث الـ cache بشكل صحيح
+    if (!window._examMaxScoresByGrade) window._examMaxScoresByGrade = {};
+    window._examMaxScoresByGrade[grade] = scores;
+    
     toast(`✅ تم حفظ إعدادات امتحانات ${grade} بنجاح`, 'success');
     const saveBtn = document.getElementById('saveExamMaxBtn');
     if (saveBtn) {
@@ -4238,6 +4241,10 @@ function saveExamMaxScores() {
     }
     // إعادة رسم الجدول
     renderAttendanceTable();
+    // تحديث التقارير لو كانت مفتوحة
+    if (typeof renderReports === 'function' && document.getElementById('reportContent')) {
+      renderReports();
+    }
   }).catch(err => {
     console.error('❌ Error saving exam max scores:', err);
     console.error('Error details:', {
@@ -4490,7 +4497,6 @@ function renderReports() {
   // تحميل إعدادات الدرجات لجميع المراحل
   db.ref(`monthData/${currentMonth}/_examMaxScores`).once('value', allScoresSnap => {
     window._examMaxScoresByGrade = allScoresSnap.val() || {};
-    console.log('📊 Loaded exam max scores:', window._examMaxScoresByGrade);
     
     let rows = Object.values(students);
     // فلتر حسب نوع المساعد
@@ -4531,7 +4537,6 @@ function renderReports() {
             const score = md.exams?.[`e${sessionNum}`];
             const gradeSettings = window._examMaxScoresByGrade?.[s.grade] || {};
             const maxScore = gradeSettings[`e${sessionNum}`] || 10;
-            console.log(`Student: ${s.name}, Grade: ${s.grade}, Session: ${sessionNum}, MaxScore: ${maxScore}, Settings:`, gradeSettings);
             return `<tr>
               <td><strong>${s.name}</strong></td>
               <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
