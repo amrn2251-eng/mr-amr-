@@ -3915,11 +3915,12 @@ function renderHonorRoll() {
     let html = `<div style="text-align:center;color:var(--text-secondary);font-size:0.9rem;margin-bottom:16px">أفضل 3 طلاب لكل مرحلة — ${monthLabel}</div>`;
     html += '<div class="honor-grid">';
     GRADES.forEach(grade => {
-      // حساب المجموع الكلي لهذه المرحلة
+      // حساب المجموع الكلي لهذه المرحلة (بدون الامتحانات اللي درجتها = 0)
       const examMaxScores = allExamMaxScores[grade] || {};
       let maxTotal = 0;
       for (let i = 1; i <= 8; i++) {
-        maxTotal += examMaxScores[`e${i}`] || 10;
+        const maxScore = examMaxScores[`e${i}`] != null ? examMaxScores[`e${i}`] : 10;
+        if (maxScore > 0) maxTotal += maxScore;
       }
       
       const all = ranks[grade] || [];
@@ -4089,15 +4090,25 @@ function buildAttRow(s) {
   let examInputs = '';
   for (let i = 1; i <= 8; i++) {
     const v = exams[`e${i}`];
-    const maxScore = examMaxScores[`e${i}`] || 10; // القيمة الافتراضية 10
-    totalMax += maxScore;
-    if (v != null && v !== '') totalScore += parseFloat(v);
+    const maxScore = examMaxScores[`e${i}`] != null ? examMaxScores[`e${i}`] : 10; // القيمة الافتراضية 10
+    
+    // لو الدرجة = 0 يعني مفيش امتحان، مايحسبوش
+    if (maxScore > 0) {
+      totalMax += maxScore;
+      if (v != null && v !== '') totalScore += parseFloat(v);
+    }
     
     const ph = `ا${i}`;
-    examInputs += `<input type="number" class="exam-inp ${v!=null&&v!==''?'filled':''}" min="0" max="${maxScore}" step="0.5"
-      value="${v!=null&&v!==''?v:''}" placeholder="${ph}"
-      onchange="saveExamScore('${s.id}',${i},this.value)"
-      title="اختبار ${i} (من ${maxScore})">`;
+    // إظهار الحقل بس لو الامتحان موجود (maxScore > 0)
+    if (maxScore > 0) {
+      examInputs += `<input type="number" class="exam-inp ${v!=null&&v!==''?'filled':''}" min="0" max="${maxScore}" step="0.5"
+        value="${v!=null&&v!==''?v:''}" placeholder="${ph}"
+        onchange="saveExamScore('${s.id}',${i},this.value)"
+        title="اختبار ${i} (من ${maxScore})">`;
+    } else {
+      // حقل معطّل لو مفيش امتحان
+      examInputs += `<input type="text" class="exam-inp" value="-" disabled title="لا يوجد امتحان ${i}">`;
+    }
   }
   
   // عرض المجموع في العمود الخاص بالدرجات
@@ -4214,8 +4225,9 @@ function saveExamMaxScores() {
   inputs.forEach(input => {
     const examNum = input.dataset.exam;
     const val = parseFloat(input.value);
-    if (isNaN(val) || val <= 0) {
-      toast(`أدخل درجة صحيحة للامتحان ${examNum}`, 'error');
+    // السماح بصفر (معناه مفيش امتحان)
+    if (isNaN(val) || val < 0) {
+      toast(`أدخل درجة صحيحة للامتحان ${examNum} (0 = لا يوجد امتحان)`, 'error');
       valid = false;
       return;
     }
@@ -4536,14 +4548,20 @@ function renderReports() {
           <tbody>${pending.map(({s, sessionNum, status, md}) => {
             const score = md.exams?.[`e${sessionNum}`];
             const gradeSettings = window._examMaxScoresByGrade?.[s.grade] || {};
-            const maxScore = gradeSettings[`e${sessionNum}`] || 10;
+            const maxScore = gradeSettings[`e${sessionNum}`] != null ? gradeSettings[`e${sessionNum}`] : 10;
+            
+            // لو الدرجة القصوى = 0 يعني مفيش امتحان
+            const scoreDisplay = maxScore > 0 
+              ? (status ? (score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/${maxScore}</strong>` : '<span style="color:var(--warning)">لم تُسجل</span>') : '—')
+              : '<span style="color:var(--text-muted)">لا يوجد امتحان</span>';
+            
             return `<tr>
               <td><strong>${s.name}</strong></td>
               <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
               <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px">${s.customCode||'-'}</code></td>
               <td><span class="badge badge-info">حصة ${sessionNum}</span></td>
               <td>${status ? '<span class="badge badge-success">✅ حاضر</span>' : '<span class="badge badge-danger">❌ غائب</span>'}</td>
-              <td>${status ? (score!=null&&score!=='' ? `<strong style="color:var(--success)">${score}/${maxScore}</strong>` : '<span style="color:var(--warning)">لم تُسجل</span>') : '—'}</td>
+              <td>${scoreDisplay}</td>
               <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendDailyReport('${s.id}')"><i class="fab fa-whatsapp"></i> إرسال</button></td>
             </tr>`;
           }).join('')}</tbody>
@@ -4572,11 +4590,12 @@ function renderReports() {
           const att = countAttendance(md);
           const score = calcTotalScore(md);
           
-          // حساب المجموع الكلي من إعدادات الدرجات
+          // حساب المجموع الكلي من إعدادات الدرجات (بدون الامتحانات اللي = 0)
           const gradeSettings = window._examMaxScoresByGrade?.[s.grade] || {};
           let totalMax = 0;
           for (let i = 1; i <= 8; i++) {
-            totalMax += gradeSettings[`e${i}`] || 10;
+            const maxScore = gradeSettings[`e${i}`] != null ? gradeSettings[`e${i}`] : 10;
+            if (maxScore > 0) totalMax += maxScore; // بس الامتحانات اللي درجتها أكبر من صفر
           }
           
           return `<tr>
@@ -4762,11 +4781,15 @@ function sendDailyReport(studentId) {
 
   // الحصول على الدرجة القصوى لهذا الامتحان حسب المرحلة
   const gradeMaxScores = (window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade]) || {};
-  const maxScore = gradeMaxScores[`e${targetSession}`] || 10;
+  const maxScore = gradeMaxScores[`e${targetSession}`] != null ? gradeMaxScores[`e${targetSession}`] : 10;
   
   // الدرجة تتبع رقم الحصة (حصة 3 → درجة اختبار 3)
   const score     = exams[`e${targetSession}`];
   const scoreText = (score != null && score !== '') ? `${score}` : 'لم يُسجل بعد';
+  
+  // سطر الدرجة - فقط لو الامتحان موجود (maxScore > 0)
+  const scoreLine = maxScore > 0 ? `\n• درجة اختبار حصة ${targetSession}: *${scoreText} / ${maxScore}*` : '';
+  
   const sessionDate = md.sessionDates?.[`s${targetSession}`] || '';
   const dateDisplay = sessionDate
     ? new Date(sessionDate).toLocaleDateString('ar-EG')
@@ -4782,7 +4805,7 @@ function sendDailyReport(studentId) {
 
   let msg = '';
   if (targetStatus === true) {
-    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *${lbl.present} ومتابع بالكامل ✅* — حصة ${targetSession}\n• درجة اختبار حصة ${targetSession}: *${scoreText} / ${maxScore}*${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
+    msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *تقرير الحضور والتقييم اليومي*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *${lbl.present} ومتابع بالكامل ✅* — حصة ${targetSession}${scoreLine}${payLine}\nلو عايز تعرف أكتر ابعت للمستر 📩`;
   } else {
     msg = `🧪 *نظام الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\n📋 *إشعار غياب*:\n• التاريخ: *${dateDisplay}*\n• ${lbl.student}: *${s.name}*\n• حالة الحضور: *❌ غائب — الحصة ${targetSession}*\n\n⚠️ يُرجى الاهتمام بانتظام حضور ${lbl.student} — الغياب يؤثر على ${s.gender === 'female' ? 'مستواها' : 'مستواه'} بشكل مباشر.\n\nلمعرفة المادة الفائتة تواصل مع المستر 📩`;
   }
@@ -4819,12 +4842,16 @@ function sendMonthlyReport(studentId) {
   let totalMax = 0;
   for (let i = 1; i <= 8; i++) {
     const v = exams[`e${i}`];
-    const maxScore = gradeMaxScores[`e${i}`] || 10;
-    totalMax += maxScore;
-    const display = v!=null&&v!=='' ? v : 'لم يُسجل';
-    const maxLabel = ` / ${maxScore}`;
-    scoreLines += `\n• اختبار ${i}: *${display}${maxLabel}*`;
-    if (v!=null&&v!=='') totalSum += parseFloat(v)||0;
+    const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
+    
+    // فقط الامتحانات اللي درجتها أكبر من صفر
+    if (maxScore > 0) {
+      totalMax += maxScore;
+      const display = v!=null&&v!=='' ? v : 'لم يُسجل';
+      const maxLabel = ` / ${maxScore}`;
+      scoreLines += `\n• اختبار ${i}: *${display}${maxLabel}*`;
+      if (v!=null&&v!=='') totalSum += parseFloat(v)||0;
+    }
   }
 
   // حالة الدفع — فقط للبرايفيت وغير المعفيين
