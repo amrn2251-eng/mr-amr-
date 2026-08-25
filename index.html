@@ -1519,6 +1519,14 @@ function doStudentLogin() {
     const all = snap.val() || {};
     const s   = Object.values(all).find(st => st.customCode === code);
     if (!s) { err.textContent = 'الكود غير صحيح'; err.style.display = 'block'; return; }
+    
+    // التحقق من حالة الطالب - لو غادر يظهر رسالة ويمنعه من الدخول
+    if ((s.status || 'active') === 'left') {
+      err.innerHTML = '<div style="background:var(--danger-bg);border:2px solid var(--danger);border-radius:8px;padding:15px;text-align:center;color:var(--danger);font-weight:700"><i class="fas fa-user-times" style="font-size:2rem;margin-bottom:8px;display:block"></i>غادر الأوربيتالي<div style="font-size:0.85rem;font-weight:400;margin-top:8px;color:var(--text-muted)">هذا الطالب غير مسجل في المنصة حالياً</div></div>';
+      err.style.display = 'block';
+      return;
+    }
+    
     currentStudentId = s.id;
     err.style.display = 'none';
     document.getElementById('loginScreen').style.display = 'none';
@@ -4184,17 +4192,18 @@ function renderExamMaxScores() {
     
     let html = '';
     for (let i = 1; i <= 8; i++) {
-      const score = scores[`e${i}`] || 10;
+      // استخدام != null بدل || عشان لو الدرجة = 0 متترجعش 10
+      const score = scores[`e${i}`] != null ? scores[`e${i}`] : 10;
       html += `<div style="display:flex;flex-direction:column;gap:4px;background:white;padding:10px;border-radius:8px;border:2px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <label style="font-size:0.85rem;color:var(--text-secondary);margin:0;font-weight:700;text-align:center">
           <i class="fas fa-file-alt" style="color:var(--accent)"></i> امتحان ${i}
         </label>
-        <input type="number" class="form-control exam-max-score" data-exam="${i}" min="0.5" max="100" step="0.5" value="${score}"
+        <input type="number" class="form-control exam-max-score" data-exam="${i}" min="0" max="100" step="0.5" value="${score}"
           style="width:100%;padding:8px;font-size:1rem;text-align:center;font-weight:800;border:2px solid var(--accent);background:var(--bg-input)"
           oninput="onExamMaxScoreChange()"
           placeholder="10"
-          title="الدرجة القصوى للامتحان ${i}">
-        <div style="font-size:0.7rem;color:var(--text-muted);text-align:center">من ${score} درجة</div>
+          title="الدرجة القصوى للامتحان ${i} (0 = لا يوجد امتحان)">
+        <div style="font-size:0.7rem;color:var(--text-muted);text-align:center">${score > 0 ? `من ${score} درجة` : 'لا يوجد امتحان'}</div>
       </div>`;
     }
     
@@ -6679,4 +6688,3 @@ function viewMyExamResult(examId, studentId) {
 </script>
 
 </body>
-</html>
