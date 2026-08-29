@@ -167,6 +167,9 @@
     <div class="nav-item" onclick="showTab('exams')" id="nav-exams">
       <i class="fas fa-file-pen"></i><span class="nav-label">الامتحانات</span>
     </div>
+    <div class="nav-item" onclick="showTab('gradeConverter')" id="nav-gradeConverter">
+      <i class="fas fa-calculator"></i><span class="nav-label">تحويل الدرجات</span>
+    </div>
   </div>
 
   <!-- topbar term indicator -->
@@ -3060,17 +3063,23 @@ function loadMonthData() {
   return new Promise(resolve => {
     db.ref(`monthData/${currentMonth}`).on('value', snap => {
       monthData = snap.val() || {};
-      if (currentUser === 'admin' || currentUser === 'assistant' || currentUser === 'observer') {
-        renderStudentsTable();
-        renderHonorRoll();
-        renderAttendanceTable();
-        renderStats();
-        renderReports();
-        if (currentUser === 'admin') renderIncomes();
-      } else if (currentUser === 'parent') {
-        renderParentPortal();
-      }
-      resolve();
+      
+      // تحميل إعدادات الدرجات القصوى لجميع المراحل (مهم لولي الأمر)
+      db.ref(`monthData/${currentMonth}/_examMaxScores`).once('value', scoresSnap => {
+        window._examMaxScoresByGrade = scoresSnap.val() || {};
+        
+        if (currentUser === 'admin' || currentUser === 'assistant' || currentUser === 'observer') {
+          renderStudentsTable();
+          renderHonorRoll();
+          renderAttendanceTable();
+          renderStats();
+          renderReports();
+          if (currentUser === 'admin') renderIncomes();
+        } else if (currentUser === 'parent') {
+          renderParentPortal();
+        }
+        resolve();
+      });
     });
   });
 }
@@ -5640,23 +5649,41 @@ function buildParentStudentCard(id) {
   if (!s) return '';
   const md = monthData[id] || {};
   const attendance = countAttendance(md);
-  const totalScore = calcTotalScore(md);
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === id);
   const rankTxt = getRankText(rankIdx, s.grade, false, s);
 
-  // درجات — grid واضح بدل badges متلاصقة
+  // درجات — grid واضح بدل badges متلاصقة + عرض الدرجة القصوى الصحيحة
+  // تحميل إعدادات الدرجات للمرحلة
+  const gradeMaxScores = (window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade]) || {};
+  
+  // حساب المجموع الكلي بناءً على الدرجات الفعلية والقصوى
+  let totalScore = 0;
+  let totalMaxScore = 0;
+  
   let scoresHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
   for (let i = 1; i <= 8; i++) {
     const v = md.exams?.[`e${i}`];
     const hasVal = v != null && v !== '';
-    const color  = hasVal ? (parseFloat(v) >= 7 ? 'var(--success)' : parseFloat(v) >= 5 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-muted)';
+    const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
+    
+    // حساب المجموع
+    if (hasVal) totalScore += parseFloat(v) || 0;
+    if (maxScore > 0) totalMaxScore += maxScore;
+    
+    // حساب النسبة المئوية لتحديد اللون
+    const percentage = hasVal ? (parseFloat(v) / maxScore * 100) : 0;
+    const color = hasVal ? (percentage >= 70 ? 'var(--success)' : percentage >= 50 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-muted)';
+    
+    // إخفاء الامتحان لو الدرجة القصوى = 0 (يعني مفيش امتحان)
+    if (maxScore === 0) continue;
+    
     scoresHtml += `
       <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center">
         <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">اختبار ${i}</div>
         <div style="font-size:1.1rem;font-weight:800;color:${color}">${hasVal ? v : '—'}</div>
-        <div style="font-size:0.68rem;color:var(--text-muted)">/ 10</div>
+        <div style="font-size:0.68rem;color:var(--text-muted)">/ ${maxScore}</div>
       </div>`;
   }
   scoresHtml += '</div>';
@@ -5753,7 +5780,7 @@ function buildParentStudentCard(id) {
       <div class="parent-card-body">
         <div style="font-size:0.85rem;color:var(--accent);font-weight:700;margin-bottom:10px">📅 ${formatMonthLabel(currentMonth)}</div>
         <div class="info-row"><span class="info-label">الحضور</span><span class="info-val">${attendance}/8 حصص</span></div>
-        <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore}/80</span></div>
+        <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore.toFixed(1)}/${totalMaxScore}</span></div>
         ${isPrivateType(s.type)?`
           <div class="info-row" style="background:rgba(79,142,247,0.08);padding:8px 10px;border-radius:8px;border:1px solid rgba(79,142,247,0.2)">
             <span class="info-label" style="color:var(--accent);font-weight:700"><i class="fas fa-money-bill-wave"></i> سعر الاشتراك الشهري</span>
@@ -6688,3 +6715,4 @@ function viewMyExamResult(examId, studentId) {
 </script>
 
 </body>
+</html>
