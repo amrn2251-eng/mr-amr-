@@ -3711,10 +3711,25 @@ function renderStudentsTable() {
   }
   // Compute ranks per grade
   const ranks = computeRanks(currentMonth);
+  
+  // تحميل إعدادات الدرجات لكل المراحل
+  const allExamMaxScores = window._examMaxScoresByGrade || {};
+  
   tbody.innerHTML = rows.map((s, i) => {
     const md = monthData[s.id] || {};
     const attendance = countAttendance(md);
-    const totalScore = calcTotalScore(md);
+    
+    // حساب المجموع الكلي بناءً على الدرجات القصوى الفعلية
+    const gradeMaxScores = allExamMaxScores[s.grade] || {};
+    let totalScore = 0;
+    let totalMaxScore = 0;
+    for (let j = 1; j <= 8; j++) {
+      const examVal = md.exams?.[`e${j}`];
+      const maxScore = gradeMaxScores[`e${j}`] != null ? gradeMaxScores[`e${j}`] : 10;
+      if (examVal != null && examVal !== '') totalScore += parseFloat(examVal) || 0;
+      if (maxScore > 0) totalMaxScore += maxScore;
+    }
+    
     const rank = ranks[s.grade]?.findIndex(r => r.id === s.id);
     const isLeft = (s.status||'active') === 'left';
     const rankTxt = rank !== undefined && rank >= 0 && rank < 3 ? ['🥇','🥈','🥉'][rank] : '-';
@@ -3736,7 +3751,7 @@ function renderStudentsTable() {
       <td><span class="badge ${typeLabel(s.type).badge}" style="font-size:0.75rem">${typeLabel(s.type).icon} ${typeLabel(s.type).text}</span></td>
       <td>${isLeft ? '<span class="badge badge-secondary">—</span>' : payCell}</td>
       <td><span class="${attendance>0?'badge badge-success':'badge badge-secondary'}">${attendance}/8</span></td>
-      <td>${totalScore}/80</td>
+      <td><strong>${totalScore.toFixed(1)}</strong>/${totalMaxScore}</td>
       <td>${isLeft ? '<span style="color:var(--text-muted);font-size:0.8rem">—</span>' : rankTxt}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -3759,7 +3774,12 @@ function openStudentDetail(id) {
   if (!s) return;
   const md = monthData[id] || {};
   const attendance = countAttendance(md);
-  const totalScore = calcTotalScore(md);
+  
+  // حساب المجموع الكلي بناءً على الدرجات القصوى الفعلية
+  const gradeMaxScores = (window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade]) || {};
+  let totalScore = 0;
+  let totalMaxScore = 0;
+  
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === id);
@@ -3772,8 +3792,13 @@ function openStudentDetail(id) {
   let examHtml = '';
   for (let i = 1; i <= 8; i++) {
     const v = md.exams?.[`e${i}`];
-    const maxLabel = i < 8 ? '/10' : '';
-    examHtml += `<span class="badge badge-accent" style="margin:2px">${v!=null&&v!==''?v:'—'}${maxLabel} ا${i}</span>`;
+    const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
+    
+    if (v != null && v !== '') totalScore += parseFloat(v) || 0;
+    if (maxScore > 0) {
+      totalMaxScore += maxScore;
+      examHtml += `<span class="badge badge-accent" style="margin:2px">${v!=null&&v!==''?v:'—'}/${maxScore} ا${i}</span>`;
+    }
   }
   document.getElementById('detailTitle').textContent = s.name + (( s.status==='left') ? ' 🚪' : '');
   document.getElementById('studentDetailContent').innerHTML = `
@@ -3793,7 +3818,7 @@ function openStudentDetail(id) {
     <div style="font-weight:700;margin-bottom:8px;color:var(--accent)">📅 ${formatMonthLabel(currentMonth)}</div>
     <div class="form-row">
       <div class="info-row"><span class="info-label">الحضور</span><span class="info-val">${attendance}/8</span></div>
-      <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore}/80</span></div>
+      <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore.toFixed(1)}/${totalMaxScore}</span></div>
     </div>
     ${isPrivateType(s.type)?`<div class="info-row"><span class="info-label">الدفع</span><span class="info-val">${md.paid
         ? `<span class="badge badge-success">مدفوع ${md.payDate||''}</span> <button class="btn btn-xs btn-danger" onclick="confirmUnpay('${s.id}');closeModal('studentDetailModal')"><i class="fas fa-undo"></i> إلغاء</button>`
@@ -3896,14 +3921,26 @@ function formatMonthLabel(monthKey) {
 }
 function computeRanks(monthKey) {
   const md = monthKey === currentMonth ? monthData : {};
+  const allExamMaxScores = window._examMaxScoresByGrade || {};
   const result = {};
   GRADES.forEach(grade => {
     // Exclude students who left
     const gradeStudents = Object.values(students).filter(s => s.grade === grade && (s.status||'active') === 'active');
-    const scored = gradeStudents.map(s => ({
-      id: s.id, name: s.name,
-      score: calcTotalScore(md[s.id] || {})
-    }));
+    const gradeMaxScores = allExamMaxScores[grade] || {};
+    
+    const scored = gradeStudents.map(s => {
+      const studentData = md[s.id] || {};
+      // حساب المجموع بناءً على الدرجات القصوى الفعلية
+      let totalScore = 0;
+      for (let i = 1; i <= 8; i++) {
+        const examVal = studentData.exams?.[`e${i}`];
+        const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
+        if (examVal != null && examVal !== '' && maxScore > 0) {
+          totalScore += parseFloat(examVal) || 0;
+        }
+      }
+      return { id: s.id, name: s.name, score: totalScore };
+    });
     scored.sort((a,b) => b.score - a.score);
     result[grade] = scored;
   });
@@ -3976,10 +4013,25 @@ function computeRanksForMonth(monthKey) {
 }
 function computeRanksSync(monthKey) {
   const md = (monthKey === currentMonth) ? monthData : {};
+  const allExamMaxScores = window._examMaxScoresByGrade || {};
   const result = {};
   GRADES.forEach(grade => {
     const gs = Object.values(students).filter(s => s.grade === grade);
-    const scored = gs.map(s => ({ id:s.id, name:s.name, score: calcTotalScore(md[s.id]||{}) }));
+    const gradeMaxScores = allExamMaxScores[grade] || {};
+    
+    const scored = gs.map(s => {
+      const studentData = md[s.id] || {};
+      // حساب المجموع بناءً على الدرجات القصوى الفعلية
+      let totalScore = 0;
+      for (let i = 1; i <= 8; i++) {
+        const examVal = studentData.exams?.[`e${i}`];
+        const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
+        if (examVal != null && examVal !== '' && maxScore > 0) {
+          totalScore += parseFloat(examVal) || 0;
+        }
+      }
+      return { id: s.id, name: s.name, score: totalScore };
+    });
     scored.sort((a,b) => b.score - a.score);
     result[grade] = scored;
   });
@@ -4606,21 +4658,23 @@ function renderReports() {
         <tbody>${pending.map(s => {
           const md = monthData[s.id] || {};
           const att = countAttendance(md);
-          const score = calcTotalScore(md);
           
           // حساب المجموع الكلي من إعدادات الدرجات (بدون الامتحانات اللي = 0)
           const gradeSettings = window._examMaxScoresByGrade?.[s.grade] || {};
+          let totalScore = 0;
           let totalMax = 0;
           for (let i = 1; i <= 8; i++) {
+            const examVal = md.exams?.[`e${i}`];
             const maxScore = gradeSettings[`e${i}`] != null ? gradeSettings[`e${i}`] : 10;
-            if (maxScore > 0) totalMax += maxScore; // بس الامتحانات اللي درجتها أكبر من صفر
+            if (examVal != null && examVal !== '') totalScore += parseFloat(examVal) || 0;
+            if (maxScore > 0) totalMax += maxScore;
           }
           
           return `<tr>
             <td><strong>${s.name}</strong></td>
             <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
             <td>${att}/8</td>
-            <td>${score}/${totalMax}</td>
+            <td><strong>${totalScore.toFixed(1)}</strong>/${totalMax}</td>
             <td><button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendMonthlyReport('${s.id}')"><i class="fab fa-whatsapp"></i> إرسال</button></td>
           </tr>`;
         }).join('')}</tbody>
