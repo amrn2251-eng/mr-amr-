@@ -2894,9 +2894,15 @@ function renderUnpaidList() {
   const labelEl = document.getElementById('unpaid-month-label');
   if (!listEl) return;
   if (labelEl) labelEl.textContent = formatMonthLabel(currentMonth);
+  
+  // فقط الطلاب النشطون (استبعاد المغادرين)
   const unpaid = Object.values(students).filter(s =>
-    isPrivateType(s.type) && !s.feeExempt && !(monthData[s.id] && monthData[s.id].paid)
+    isPrivateType(s.type) && 
+    !s.feeExempt && 
+    (s.status || 'active') === 'active' && // استبعاد المغادرين
+    !(monthData[s.id] && monthData[s.id].paid)
   );
+  
   if (countEl) countEl.textContent = unpaid.length;
   if (!unpaid.length) {
     listEl.innerHTML = '<p style="color:var(--success);padding:8px 0"><i class="fas fa-check-circle"></i> جميع الطلاب البرايفيت دفعوا هذا الشهر 🎉</p>';
@@ -5324,8 +5330,13 @@ function renderStats() {
   const private_ = activeStudents.filter(s => s.type === 'private').length;
   const home_    = activeStudents.filter(s => s.type === 'home').length;
   const center   = activeStudents.filter(s => s.type === 'center').length;
-  const paid     = activeStudents.filter(s => isPrivateType(s.type) && monthData[s.id]?.paid).length;
-  const allPrivate = private_ + home_;
+  
+  // الطلاب اللي دفعوا (من البرايفيت والمنزل، بدون المعفيين)
+  const paid = activeStudents.filter(s => isPrivateType(s.type) && !s.feeExempt && monthData[s.id]?.paid).length;
+  
+  // كل البرايفيت والمنزل النشطين (بدون المعفيين)
+  const allPrivate = activeStudents.filter(s => isPrivateType(s.type) && !s.feeExempt).length;
+  
   let html = `<div class="stats-grid">
     <div class="stat-card stat-accent"><div class="stat-icon">👥</div><div class="stat-val">${total}</div><div class="stat-label">الطلاب النشطون</div></div>
     <div class="stat-card stat-info"><div class="stat-icon">🏠</div><div class="stat-val">${private_}</div><div class="stat-label">برايفيت</div></div>
@@ -5341,8 +5352,12 @@ function renderStats() {
     const gPrivate  = gs.filter(s => s.type === 'private').length;
     const gHome     = gs.filter(s => s.type === 'home').length;
     const gCenter   = gs.filter(s => s.type === 'center').length;
-    const gAllPriv  = gPrivate + gHome;
-    const gPaid     = gs.filter(s => isPrivateType(s.type) && monthData[s.id]?.paid).length;
+    
+    // الطلاب اللي دفعوا في هذا الصف (بدون المعفيين)
+    const gPaid = gs.filter(s => isPrivateType(s.type) && !s.feeExempt && monthData[s.id]?.paid).length;
+    
+    // كل البرايفيت والمنزل في هذا الصف (بدون المعفيين)
+    const gAllPriv = gs.filter(s => isPrivateType(s.type) && !s.feeExempt).length;
     if (!gs.length) return;
     html += `<div class="card">
       <div class="card-header"><span class="card-title"><i class="fas fa-users" style="color:var(--accent)"></i> ${grade}</span><span class="badge badge-accent">${gs.length} طالب</span></div>
