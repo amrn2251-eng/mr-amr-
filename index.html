@@ -5518,9 +5518,6 @@ function renderIncomes() {
   renderUnpaidList();
 
   const list = Object.values(centerIncomes);
-  
-  // تحديث عداد الإيرادات
-  if (countEl) countEl.textContent = list.length;
   const [cy, cm] = currentMonth.split('_');
 
   // الإيرادات اليدوية فقط (بدون التلقائية)
@@ -5587,10 +5584,21 @@ function renderIncomes() {
 
   if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fas fa-receipt"></i><p>لا توجد إيرادات</p></div></td></tr>`;
+    if (countEl) countEl.textContent = 0;
     return;
   }
-  list.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-  tbody.innerHTML = list.map((inc, i) =>
+  
+  // عرض فقط إيرادات الشهر الحالي
+  const currentMonthIncomes = list.filter(inc => inc.year === cy && inc.month === cm);
+  if (countEl) countEl.textContent = currentMonthIncomes.length;
+  
+  if (!currentMonthIncomes.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">لا توجد إيرادات في ${formatMonthLabel(currentMonth)}</td></tr>`;
+    return;
+  }
+  
+  currentMonthIncomes.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  tbody.innerHTML = currentMonthIncomes.map((inc, i) =>
     `<tr style="${inc.autoFromPay ? 'background:rgba(63,185,80,0.04)' : ''}">
       <td>${i+1}</td>
       <td>
@@ -5604,20 +5612,24 @@ function renderIncomes() {
     </tr>`
   ).join('');
 
-  // عرض المصروفات
+  // عرض المصروفات للشهر الحالي فقط
   const expBody = document.getElementById('expenseBody');
   const expCountEl = document.getElementById('expense-count');
   if (expBody) {
+    const [ey, em] = currentMonth.split('_');
     const expAll = Object.values(expenses || {});
     
-    // تحديث عداد المصروفات
-    if (expCountEl) expCountEl.textContent = expAll.length;
+    // فلترة المصروفات للشهر الحالي فقط
+    const currentMonthExpenses = expAll.filter(e => e.year === ey && e.month === em);
     
-    if (!expAll.length) {
-      expBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">لا توجد مصروفات مسجلة</td></tr>`;
+    // تحديث عداد المصروفات
+    if (expCountEl) expCountEl.textContent = currentMonthExpenses.length;
+    
+    if (!currentMonthExpenses.length) {
+      expBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">لا توجد مصروفات في ${formatMonthLabel(currentMonth)}</td></tr>`;
     } else {
-      expAll.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-      expBody.innerHTML = expAll.map((e,i) => `<tr>
+      currentMonthExpenses.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+      expBody.innerHTML = currentMonthExpenses.map((e,i) => `<tr>
         <td>${i+1}</td>
         <td>${e.desc}</td>
         <td style="color:var(--danger);font-weight:700">${parseFloat(e.amount||0).toLocaleString('ar-EG')} ج</td>
