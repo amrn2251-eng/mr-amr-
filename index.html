@@ -167,9 +167,6 @@
     <div class="nav-item" onclick="showTab('exams')" id="nav-exams">
       <i class="fas fa-file-pen"></i><span class="nav-label">الامتحانات</span>
     </div>
-    <div class="nav-item" onclick="showTab('gradeConverter')" id="nav-gradeConverter">
-      <i class="fas fa-calculator"></i><span class="nav-label">تحويل الدرجات</span>
-    </div>
   </div>
 
   <!-- topbar term indicator -->
@@ -446,18 +443,25 @@
           <div id="reconcileResult" style="display:none"></div>
         </div>
         <!-- /Daily Reconciliation -->
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header" style="padding:14px 18px">
-            <span class="card-title"><i class="fas fa-exclamation-circle" style="color:var(--danger)"></i> الطلاب الذين لم يدفعوا — <span id="unpaid-month-label"></span></span>
+        <div class="card" style="margin-bottom:16px;border-color:rgba(248,81,73,0.3)">
+          <div class="card-header" style="padding:14px 18px;cursor:pointer;user-select:none" onclick="toggleUnpaidList()">
+            <div style="display:flex;align-items:center;gap:10px">
+              <i class="fas fa-chevron-down" id="unpaid-toggle-icon" style="color:var(--danger);transition:transform 0.3s"></i>
+              <span class="card-title"><i class="fas fa-exclamation-circle" style="color:var(--danger)"></i> الطلاب الذين لم يدفعوا — <span id="unpaid-month-label"></span></span>
+            </div>
             <span id="unpaid-count" class="badge badge-danger">0</span>
           </div>
-          <div id="unpaid-list" style="padding:0 18px 14px"></div>
+          <div id="unpaid-list" style="padding:0 18px 14px;display:none"></div>
         </div>
-        <div class="card" style="padding:0">
-          <div class="card-header" style="padding:14px 18px">
-            <span class="card-title">سجل الإيرادات</span>
+        <div class="card" style="padding:0;border-color:rgba(79,142,247,0.3)">
+          <div class="card-header" style="padding:14px 18px;cursor:pointer;user-select:none" onclick="toggleIncomeList()">
+            <div style="display:flex;align-items:center;gap:10px">
+              <i class="fas fa-chevron-down" id="income-toggle-icon" style="color:var(--accent);transition:transform 0.3s"></i>
+              <span class="card-title"><i class="fas fa-money-bill-wave" style="color:var(--success)"></i> سجل الإيرادات</span>
+            </div>
+            <span id="income-count" class="badge badge-success">0</span>
           </div>
-          <div class="table-wrap">
+          <div id="incomeTableWrap" class="table-wrap" style="display:none">
             <table>
               <thead><tr><th>#</th><th>الوصف</th><th>المبلغ</th><th>الشهر</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
               <tbody id="incomeBody"></tbody>
@@ -466,11 +470,17 @@
         </div>
         <!-- جدول المصروفات -->
         <div class="card" style="padding:0;margin-top:0;border-color:rgba(248,81,73,0.2)">
-          <div class="card-header" style="padding:14px 18px">
-            <span class="card-title"><i class="fas fa-receipt" style="color:var(--danger)"></i> سجل المصروفات</span>
-            <button class="btn btn-xs btn-danger" onclick="openAddExpense()"><i class="fas fa-plus"></i> إضافة</button>
+          <div class="card-header" style="padding:14px 18px;cursor:pointer;user-select:none" onclick="toggleExpenseList()">
+            <div style="display:flex;align-items:center;gap:10px">
+              <i class="fas fa-chevron-down" id="expense-toggle-icon" style="color:var(--danger);transition:transform 0.3s"></i>
+              <span class="card-title"><i class="fas fa-receipt" style="color:var(--danger)"></i> سجل المصروفات</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="expense-count" class="badge badge-danger">0</span>
+              <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();openAddExpense()"><i class="fas fa-plus"></i> إضافة</button>
+            </div>
           </div>
-          <div class="table-wrap">
+          <div id="expenseTableWrap" class="table-wrap" style="display:none">
             <table>
               <thead><tr><th>#</th><th>الوصف</th><th>المبلغ</th><th>الشهر</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
               <tbody id="expenseBody"></tbody>
@@ -2888,6 +2898,20 @@ function updateTermBadge() {
 // =============================================
 // UNPAID STUDENTS LIST (in safe)
 // =============================================
+function toggleUnpaidList() {
+  const listEl = document.getElementById('unpaid-list');
+  const iconEl = document.getElementById('unpaid-toggle-icon');
+  if (!listEl || !iconEl) return;
+  
+  if (listEl.style.display === 'none') {
+    listEl.style.display = 'block';
+    iconEl.style.transform = 'rotate(180deg)';
+  } else {
+    listEl.style.display = 'none';
+    iconEl.style.transform = 'rotate(0deg)';
+  }
+}
+
 function renderUnpaidList() {
   const listEl = document.getElementById('unpaid-list');
   const countEl = document.getElementById('unpaid-count');
@@ -2981,10 +3005,11 @@ function renderArchiveTable() {
   }
   const search = (document.getElementById('archiveSearch').value || '').trim().toLowerCase();
   let rows = Object.values(archivedMonthData.students);
-  if (search) rows = rows.filter(s =>
-    (s.name||'').toLowerCase().includes(search) ||
-    (s.customCode||'').toLowerCase().includes(search)
-  );
+  if (search) rows = rows.filter(s => {
+    const nameMatch = (s.name||'').toLowerCase().includes(search);
+    const codeMatch = (s.customCode||'').toLowerCase() === search; // مطابقة تامة للكود
+    return nameMatch || codeMatch;
+  });
   rows.sort((a,b) => {
     const aScore = calcTotalScore(a.monthData || {});
     const bScore = calcTotalScore(b.monthData || {});
@@ -3702,10 +3727,11 @@ function renderStudentsTable() {
   // Always show all students in the table (including left), but mark them
   if (grade) rows = rows.filter(s => s.grade === grade);
   if (type && currentUser === 'admin') rows = rows.filter(s => s.type === type);
-  if (search) rows = rows.filter(s =>
-    (s.name||'').toLowerCase().includes(search) ||
-    (s.customCode||'').toLowerCase().includes(search)
-  );
+  if (search) rows = rows.filter(s => {
+    const nameMatch = (s.name||'').toLowerCase().includes(search);
+    const codeMatch = (s.customCode||'').toLowerCase() === search; // مطابقة تامة للكود
+    return nameMatch || codeMatch;
+  });
   rows.sort((a,b) => {
     // Active students first
     if ((a.status||'active') !== (b.status||'active')) return (a.status||'active') === 'active' ? -1 : 1;
@@ -5465,6 +5491,20 @@ function deleteIncome(id) {
   db.ref(`centerIncomes/${id}`).remove().then(() => toast('تم الحذف','success'));
 }
 
+function toggleIncomeList() {
+  const wrapEl = document.getElementById('incomeTableWrap');
+  const iconEl = document.getElementById('income-toggle-icon');
+  if (!wrapEl || !iconEl) return;
+  
+  if (wrapEl.style.display === 'none') {
+    wrapEl.style.display = 'block';
+    iconEl.style.transform = 'rotate(180deg)';
+  } else {
+    wrapEl.style.display = 'none';
+    iconEl.style.transform = 'rotate(0deg)';
+  }
+}
+
 function renderIncomes() {
   const rdEl = document.getElementById('reconcileDate');
   if (rdEl && !rdEl.value) rdEl.value = new Date().toISOString().split('T')[0];
@@ -5473,10 +5513,14 @@ function renderIncomes() {
 
   const tbody   = document.getElementById('incomeBody');
   const statsEl = document.getElementById('safeStats');
+  const countEl = document.getElementById('income-count');
   if (!tbody || !statsEl) return;
   renderUnpaidList();
 
   const list = Object.values(centerIncomes);
+  
+  // تحديث عداد الإيرادات
+  if (countEl) countEl.textContent = list.length;
   const [cy, cm] = currentMonth.split('_');
 
   // الإيرادات اليدوية فقط (بدون التلقائية)
@@ -5562,8 +5606,13 @@ function renderIncomes() {
 
   // عرض المصروفات
   const expBody = document.getElementById('expenseBody');
+  const expCountEl = document.getElementById('expense-count');
   if (expBody) {
     const expAll = Object.values(expenses || {});
+    
+    // تحديث عداد المصروفات
+    if (expCountEl) expCountEl.textContent = expAll.length;
+    
     if (!expAll.length) {
       expBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">لا توجد مصروفات مسجلة</td></tr>`;
     } else {
@@ -5577,6 +5626,20 @@ function renderIncomes() {
         <td><button class="btn btn-xs btn-danger" onclick="deleteExpense('${e.id}')"><i class="fas fa-trash"></i></button></td>
       </tr>`).join('');
     }
+  }
+}
+
+function toggleExpenseList() {
+  const wrapEl = document.getElementById('expenseTableWrap');
+  const iconEl = document.getElementById('expense-toggle-icon');
+  if (!wrapEl || !iconEl) return;
+  
+  if (wrapEl.style.display === 'none') {
+    wrapEl.style.display = 'block';
+    iconEl.style.transform = 'rotate(180deg)';
+  } else {
+    wrapEl.style.display = 'none';
+    iconEl.style.transform = 'rotate(0deg)';
   }
 }
 
