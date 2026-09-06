@@ -81,7 +81,7 @@
         ادخل بكود الطالب الخاص بك للدخول على الامتحانات
       </div>
       <div class="form-group">
-        <label>كود الطالب</label>
+        <label>كود الطالب <span style="color:var(--danger)">*</span></label>
         <input type="text" id="studentCodeLogin" class="form-control" placeholder="أدخل الكود"
           onkeydown="if(event.key==='Enter') doStudentLogin()">
       </div>
@@ -1527,11 +1527,23 @@ let examsData        = {};
 function doStudentLogin() {
   const code = (document.getElementById('studentCodeLogin')?.value || '').trim();
   const err  = document.getElementById('loginErr');
-  if (!code) { err.textContent = 'أدخل كود الطالب'; err.style.display = 'block'; return; }
+  
+  if (!code) { 
+    err.textContent = 'أدخل كود الطالب'; 
+    err.style.display = 'block'; 
+    return; 
+  }
+  
+  // البحث عن الطالب بالكود
   db.ref('students').once('value', snap => {
     const all = snap.val() || {};
     const s   = Object.values(all).find(st => st.customCode === code);
-    if (!s) { err.textContent = 'الكود غير صحيح'; err.style.display = 'block'; return; }
+    
+    if (!s) { 
+      err.textContent = 'الكود غير صحيح'; 
+      err.style.display = 'block'; 
+      return; 
+    }
     
     // التحقق من حالة الطالب - لو غادر يظهر رسالة ويمنعه من الدخول
     if ((s.status || 'active') === 'left') {
@@ -1540,13 +1552,94 @@ function doStudentLogin() {
       return;
     }
     
-    currentStudentId = s.id;
     err.style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('studentExamScreen').style.display = 'block';
-    document.getElementById('studentExamUser').textContent = `👨‍🎓 ${s.name} — ${s.grade}`;
-    loadStudentExams(s);
+    
+    // إظهار نافذة التحقق من آخر 4 أرقام
+    showStudentVerificationModal(s);
   });
+}
+
+function showStudentVerificationModal(student) {
+  const existing = document.getElementById('studentVerifyModal');
+  if (existing) existing.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'studentVerifyModal';
+  modal.className = 'modal-backdrop open';
+  modal.innerHTML = `
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <span class="modal-title"><i class="fas fa-shield-alt" style="color:var(--accent2)"></i> التحقق من الهوية</span>
+      </div>
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="width:80px;height:80px;margin:0 auto 16px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:2.5rem">
+          🔐
+        </div>
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;color:var(--text-primary)">
+          مرحباً ${student.name}
+        </div>
+        <div style="font-size:0.85rem;color:var(--text-secondary)">
+          للتأكد من هويتك، أدخل آخر 4 أرقام من رقم ولي الأمر
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-weight:600">آخر 4 أرقام من رقم ولي الأمر <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="verifyLast4" class="form-control" 
+          placeholder="مثال: 6672" 
+          maxlength="4"
+          style="text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:8px"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+          onkeydown="if(event.key==='Enter' && this.value.length===4) verifyStudentPhone('${student.id}')">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;text-align:center">
+          <i class="fas fa-info-circle"></i> أدخل الأرقام الأربعة الأخيرة فقط
+        </div>
+      </div>
+      <div id="verifyError" style="display:none;background:var(--danger-bg);border:1px solid var(--danger);border-radius:8px;padding:10px;margin-bottom:12px;text-align:center;color:var(--danger);font-size:0.85rem"></div>
+      <div class="modal-footer" style="justify-content:center">
+        <button class="btn btn-primary" onclick="verifyStudentPhone('${student.id}')" style="min-width:120px">
+          <i class="fas fa-check"></i> تأكيد
+        </button>
+      </div>
+    </div>`;
+  
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('verifyLast4').focus(), 100);
+}
+
+function verifyStudentPhone(studentId) {
+  const last4 = (document.getElementById('verifyLast4')?.value || '').trim();
+  const errEl = document.getElementById('verifyError');
+  
+  if (!last4 || last4.length !== 4) {
+    errEl.textContent = 'يجب إدخال 4 أرقام';
+    errEl.style.display = 'block';
+    return;
+  }
+  
+  const s = students[studentId];
+  if (!s) return;
+  
+  const studentPhone = s.phone || '';
+  const studentLast4 = studentPhone.slice(-4);
+  
+  if (studentPhone === 'none' || studentLast4 !== last4) {
+    errEl.innerHTML = '<i class="fas fa-times-circle"></i> الأرقام غير صحيحة<br><span style="font-size:0.8rem">تأكد من آخر 4 أرقام من رقم ولي الأمر</span>';
+    errEl.style.display = 'block';
+    
+    // تأثير اهتزاز للحقل
+    const input = document.getElementById('verifyLast4');
+    input.style.animation = 'shake 0.5s';
+    setTimeout(() => { input.style.animation = ''; input.value = ''; input.focus(); }, 500);
+    return;
+  }
+  
+  // نجح التحقق - الدخول للامتحانات
+  currentStudentId = s.id;
+  document.getElementById('studentVerifyModal').remove();
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('studentExamScreen').style.display = 'block';
+  document.getElementById('studentExamUser').textContent = `👨‍🎓 ${s.name} — ${s.grade}`;
+  loadStudentExams(s);
 }
 
 function doStudentLogout() {
@@ -5741,9 +5834,34 @@ function doClearServer() {
 // =============================================
 function parentSearchByCode() {
   const code = (document.getElementById('parentCodeSearch').value || '').trim();
-  if (!code) { toast('أدخل كود الطالب','error'); return; }
+  const last4 = (document.getElementById('parentCodeLast4').value || '').trim();
+  
+  if (!code) { 
+    toast('أدخل كود الطالب','error'); 
+    return; 
+  }
+  
+  if (!last4 || last4.length !== 4) { 
+    toast('أدخل آخر 4 أرقام من رقم ولي الأمر','error'); 
+    return; 
+  }
+  
   const found = Object.values(students).find(s => s.customCode === code);
-  if (!found) { toast('لا يوجد طالب بهذا الكود','error'); return; }
+  
+  if (!found) { 
+    toast('لا يوجد طالب بهذا الكود','error'); 
+    return; 
+  }
+  
+  // التحقق من آخر 4 أرقام من رقم الواتساب
+  const studentPhone = found.phone || '';
+  const studentLast4 = studentPhone.slice(-4);
+  
+  if (studentPhone === 'none' || studentLast4 !== last4) {
+    toast('آخر 4 أرقام غير صحيحة - تأكد من رقم ولي الأمر','error');
+    return;
+  }
+  
   // أضف/استبدل نتيجة البحث
   const container = document.getElementById('parentPortalContent');
   const old = document.getElementById('codeSearchResult');
@@ -5766,12 +5884,21 @@ function renderParentPortal() {
   const searchBar = `
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-        <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px">
-          <label><i class="fas fa-search"></i> بحث بكود الطالب</label>
-          <input type="text" id="parentCodeSearch" class="form-control" placeholder="أدخل كود الطالب"
+        <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px">
+          <label><i class="fas fa-id-card"></i> كود الطالب</label>
+          <input type="text" id="parentCodeSearch" class="form-control" placeholder="أدخل الكود"
+            onkeydown="if(event.key==='Enter') document.getElementById('parentCodeLast4').focus()">
+        </div>
+        <div class="form-group" style="margin-bottom:0;min-width:140px">
+          <label><i class="fas fa-shield-alt"></i> آخر 4 أرقام</label>
+          <input type="text" id="parentCodeLast4" class="form-control" placeholder="مثال: 6672" maxlength="4"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'')"
             onkeydown="if(event.key==='Enter') parentSearchByCode()">
         </div>
         <button class="btn btn-primary" onclick="parentSearchByCode()"><i class="fas fa-search"></i> بحث</button>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">
+        <i class="fas fa-info-circle"></i> للأمان: يجب إدخال آخر 4 أرقام من رقم ولي الأمر
       </div>
     </div>`;
 
