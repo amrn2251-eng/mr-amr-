@@ -1492,29 +1492,38 @@ function showSimpleVerification(studentId, student, searchMode) {
   const verifyDiv = document.createElement('div');
   verifyDiv.id = 'parentVerifyDiv';
   verifyDiv.innerHTML = `
-    <div style="background:linear-gradient(135deg,rgba(79,142,247,0.08),rgba(63,185,80,0.04));border:2px solid rgba(79,142,247,0.3);border-radius:12px;padding:20px;margin-bottom:14px">
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:2.5rem;margin-bottom:8px">🔐</div>
-        <div style="font-weight:800;font-size:1.05rem;color:var(--text-primary);margin-bottom:4px">التحقق من الهوية</div>
-        <div style="font-size:0.88rem;color:var(--text-secondary)">ولي أمر: <strong style="color:var(--accent)">${student.name}</strong></div>
+    <div style="background:linear-gradient(135deg,rgba(79,142,247,0.08),rgba(63,185,80,0.04));border:2px solid rgba(79,142,247,0.3);border-radius:12px;padding:18px;margin-bottom:14px">
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:2.2rem;margin-bottom:6px">🔐</div>
+        <div style="font-weight:800;font-size:1rem;color:var(--text-primary);margin-bottom:3px">التحقق من الهوية</div>
+        <div style="font-size:0.82rem;color:var(--text-secondary)">ولي أمر: <strong style="color:var(--accent)">${student.name}</strong></div>
       </div>
-      <div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:12px;margin-bottom:14px;font-size:0.8rem;color:var(--text-secondary);text-align:center">
+      <div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:10px;margin-bottom:12px;font-size:0.75rem;color:var(--text-secondary);text-align:center">
         <i class="fas fa-shield-check" style="color:var(--accent)"></i>
-        أدخل آخر <strong>4 أرقام</strong> من رقم الواتساب المسجل
+        أدخل آخر <strong>4 أرقام</strong> من رقم الواتساب
       </div>
-      <div class="form-group" style="margin-bottom:14px">
-        <label style="font-weight:700;font-size:0.88rem">آخر 4 أرقام <span style="color:var(--danger)">*</span></label>
-        <input type="text" id="verifyLast4Input" class="form-control" placeholder="مثال: 6672" maxlength="4" inputmode="numeric" autocomplete="off" style="text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:10px;padding:14px" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'&&this.value.length===4)doSimpleVerify('${studentId}','${searchMode}')">
-        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;text-align:center"><i class="fas fa-info-circle"></i> مثال: لو رقمك <strong>01112996672</strong> اكتب <strong>6672</strong></div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-weight:700;font-size:0.82rem">آخر 4 أرقام <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="verifyLast4Input" class="form-control" placeholder="مثال: 6672" maxlength="4" inputmode="numeric" autocomplete="off" style="text-align:center;font-size:1.4rem;font-weight:700;letter-spacing:8px;padding:12px" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'&&this.value.length===4)doSimpleVerify('${studentId}','${searchMode}')">
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:5px;text-align:center"><i class="fas fa-info-circle"></i> مثال: <strong>01112996672</strong> → اكتب <strong>6672</strong></div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" style="flex:1" onclick="cancelVerification('${searchMode}')"><i class="fas fa-arrow-right"></i> رجوع</button>
-        <button class="btn btn-primary" style="flex:2" onclick="doSimpleVerify('${studentId}','${searchMode}')"><i class="fas fa-check-circle"></i> تحقق</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-secondary" style="flex:1;font-size:0.85rem;padding:10px" onclick="cancelVerification('${searchMode}')"><i class="fas fa-arrow-right"></i> رجوع</button>
+        <button class="btn btn-primary" style="flex:2;font-size:0.85rem;padding:10px" onclick="doSimpleVerify('${studentId}','${searchMode}')"><i class="fas fa-check-circle"></i> تحقق</button>
       </div>
     </div>`;
   
   document.getElementById('parentLoginForm').appendChild(verifyDiv);
-  setTimeout(() => { const inp = document.getElementById('verifyLast4Input'); if (inp) inp.focus(); }, 100);
+  
+  // scroll للحقل عشان يظهر
+  setTimeout(() => { 
+    const inp = document.getElementById('verifyLast4Input'); 
+    if (inp) {
+      inp.focus();
+      inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 100);
+  
   window._tempStudentData = student;
 }
 
