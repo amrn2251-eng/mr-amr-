@@ -240,6 +240,15 @@
             <option value="">-- اختر الصف --</option>
           </select>
         </div>
+        <div class="form-group">
+          <label>نوع الطالب</label>
+          <select class="form-control" id="attTypeFilter" onchange="renderAttendanceTable()">
+            <option value="">الكل</option>
+            <option value="private">🏠 برايفيت</option>
+            <option value="home">🚗 برايفيت منزل</option>
+            <option value="center">🏫 سنتر</option>
+          </select>
+        </div>
       </div>
       <!-- Quick attendance input -->
       <div class="card" style="padding:14px 18px;margin-bottom:12px">
@@ -3934,19 +3943,23 @@ function renderStudentsTable() {
   tbody.innerHTML = rows.map((s, i) => {
     const md = monthData[s.id] || {};
     const attendance = countAttendance(md);
+    const isExamsOnlyStudent = s.type === 'exams-only';
     
     // حساب المجموع الكلي بناءً على الدرجات القصوى الفعلية
     const gradeMaxScores = allExamMaxScores[s.grade] || {};
     let totalScore = 0;
     let totalMaxScore = 0;
-    for (let j = 1; j <= 8; j++) {
-      const examVal = md.exams?.[`e${j}`];
-      const maxScore = gradeMaxScores[`e${j}`] != null ? gradeMaxScores[`e${j}`] : 10;
-      if (examVal != null && examVal !== '') totalScore += parseFloat(examVal) || 0;
-      if (maxScore > 0) totalMaxScore += maxScore;
+    
+    if (!isExamsOnlyStudent) {
+      for (let j = 1; j <= 8; j++) {
+        const examVal = md.exams?.[`e${j}`];
+        const maxScore = gradeMaxScores[`e${j}`] != null ? gradeMaxScores[`e${j}`] : 10;
+        if (examVal != null && examVal !== '') totalScore += parseFloat(examVal) || 0;
+        if (maxScore > 0) totalMaxScore += maxScore;
+      }
     }
     
-    const rank = ranks[s.grade]?.findIndex(r => r.id === s.id);
+    const rank = !isExamsOnlyStudent ? ranks[s.grade]?.findIndex(r => r.id === s.id) : -1;
     const isLeft = (s.status||'active') === 'left';
     const rankTxt = rank !== undefined && rank >= 0 && rank < 3 ? ['🥇','🥈','🥉'][rank] : '-';
     const payCell = isPrivateType(s.type)
@@ -3956,19 +3969,23 @@ function renderStudentsTable() {
           ? `<span class="badge badge-success" style="cursor:pointer" onclick="confirmUnpay('${s.id}')" title="اضغط لإلغاء الدفع"><i class="fas fa-check"></i> مدفوع ${md.payDate?'('+md.payDate+')':''} <i class="fas fa-times" style="font-size:0.7rem;opacity:0.7"></i></span>`
           : `<button class="btn btn-sm btn-warning" onclick="openPayModal('${s.id}')"><i class="fas fa-money-bill-wave"></i> ${s.monthlyFee?s.monthlyFee+' ج':''}</button>`))
       : `<span class="badge badge-secondary">${s.centerName ? s.centerName : 'سنتر'}</span>`;
+    
+    const scoreDisplay = isExamsOnlyStudent ? '<span style="color:var(--text-muted)">—</span>' : `<strong>${totalScore.toFixed(1)}</strong>/${totalMaxScore}`;
+    
     return `<tr style="${isLeft?'opacity:0.5;':''}">
       <td>${i+1}</td>
       <td>
         <strong>${s.name}</strong>
         ${isLeft ? '<span class="badge badge-danger" style="font-size:0.7rem;margin-right:4px">غادر</span>' : ''}
+        ${isExamsOnlyStudent ? '<span style="font-size:0.75rem;margin-right:4px">📝</span>' : ''}
       </td>
       <td><span class="badge badge-accent" style="font-size:0.75rem">${s.grade}</span></td>
       <td><code style="background:var(--bg-card2);padding:2px 8px;border-radius:4px">${s.customCode||'-'}</code></td>
       <td><span class="badge ${typeLabel(s.type).badge}" style="font-size:0.75rem">${typeLabel(s.type).icon} ${typeLabel(s.type).text}</span></td>
       <td>${isLeft ? '<span class="badge badge-secondary">—</span>' : payCell}</td>
       <td><span class="${attendance>0?'badge badge-success':'badge badge-secondary'}">${attendance}/8</span></td>
-      <td><strong>${totalScore.toFixed(1)}</strong>/${totalMaxScore}</td>
-      <td>${isLeft ? '<span style="color:var(--text-muted);font-size:0.8rem">—</span>' : rankTxt}</td>
+      <td>${scoreDisplay}</td>
+      <td>${isLeft || isExamsOnlyStudent ? '<span style="color:var(--text-muted);font-size:0.8rem">—</span>' : rankTxt}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-xs btn-secondary" onclick="openStudentDetail('${s.id}')" title="تفاصيل"><i class="fas fa-eye"></i></button>
@@ -3990,32 +4007,43 @@ function openStudentDetail(id) {
   if (!s) return;
   const md = monthData[id] || {};
   const attendance = countAttendance(md);
+  const isExamsOnlyStudent = s.type === 'exams-only';
   
   // حساب المجموع الكلي بناءً على الدرجات القصوى الفعلية
   const gradeMaxScores = (window._examMaxScoresByGrade && window._examMaxScoresByGrade[s.grade]) || {};
   let totalScore = 0;
   let totalMaxScore = 0;
   
-  const ranks = computeRanks(currentMonth);
-  const gradeRanks = ranks[s.grade] || [];
-  const rankIdx = gradeRanks.findIndex(r => r.id === id);
-  const rankTxt = getRankText(rankIdx, s.grade, false, s);
+  let rankTxt = '<span style="color:var(--text-muted)">-</span>';
+  if (!isExamsOnlyStudent) {
+    const ranks = computeRanks(currentMonth);
+    const gradeRanks = ranks[s.grade] || [];
+    const rankIdx = gradeRanks.findIndex(r => r.id === id);
+    rankTxt = getRankText(rankIdx, s.grade, false, s);
+  }
+  
   let sessHtml = '';
   for (let i = 1; i <= 8; i++) {
     const v = md.sessions?.[`s${i}`];
     sessHtml += `<span class="badge ${v===true?'badge-success':v===false?'badge-danger':'badge-secondary'}" style="margin:2px">${v===true?'✅':v===false?'❌':'—'} ح${i}</span>`;
   }
+  
   let examHtml = '';
-  for (let i = 1; i <= 8; i++) {
-    const v = md.exams?.[`e${i}`];
-    const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
-    
-    if (v != null && v !== '') totalScore += parseFloat(v) || 0;
-    if (maxScore > 0) {
-      totalMaxScore += maxScore;
-      examHtml += `<span class="badge badge-accent" style="margin:2px">${v!=null&&v!==''?v:'—'}/${maxScore} ا${i}</span>`;
+  if (isExamsOnlyStudent) {
+    examHtml = '<span style="color:var(--text-muted)">📝 طالب امتحانات فقط - لا توجد درجات</span>';
+  } else {
+    for (let i = 1; i <= 8; i++) {
+      const v = md.exams?.[`e${i}`];
+      const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
+      
+      if (v != null && v !== '') totalScore += parseFloat(v) || 0;
+      if (maxScore > 0) {
+        totalMaxScore += maxScore;
+        examHtml += `<span class="badge badge-accent" style="margin:2px">${v!=null&&v!==''?v:'—'}/${maxScore} ا${i}</span>`;
+      }
     }
   }
+  
   document.getElementById('detailTitle').textContent = s.name + (( s.status==='left') ? ' 🚪' : '');
   document.getElementById('studentDetailContent').innerHTML = `
     <div class="form-row">
@@ -4034,15 +4062,15 @@ function openStudentDetail(id) {
     <div style="font-weight:700;margin-bottom:8px;color:var(--accent)">📅 ${formatMonthLabel(currentMonth)}</div>
     <div class="form-row">
       <div class="info-row"><span class="info-label">الحضور</span><span class="info-val">${attendance}/8</span></div>
-      <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore.toFixed(1)}/${totalMaxScore}</span></div>
+      ${!isExamsOnlyStudent ? `<div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore.toFixed(1)}/${totalMaxScore}</span></div>` : ''}
     </div>
     ${isPrivateType(s.type)?`<div class="info-row"><span class="info-label">الدفع</span><span class="info-val">${md.paid
         ? `<span class="badge badge-success">مدفوع ${md.payDate||''}</span> <button class="btn btn-xs btn-danger" onclick="confirmUnpay('${s.id}');closeModal('studentDetailModal')"><i class="fas fa-undo"></i> إلغاء</button>`
         : `<span class="badge badge-danger">غير مدفوع</span> <button class="btn btn-xs btn-warning" onclick="openPayModal('${s.id}');closeModal('studentDetailModal')"><i class="fas fa-money-bill-wave"></i> تسجيل</button>`
       }</span></div>`:''}
     <div style="margin-top:10px"><div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:6px">الحضور:</div>${sessHtml}</div>
-    <div style="margin-top:10px"><div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:6px">الدرجات:</div>${examHtml}</div>
-    <div class="info-row" style="margin-top:10px"><span class="info-label">المركز</span><span class="info-val">${rankTxt}</span></div>
+    ${!isExamsOnlyStudent ? `<div style="margin-top:10px"><div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:6px">الدرجات:</div>${examHtml}</div>` : ''}
+    ${!isExamsOnlyStudent ? `<div class="info-row" style="margin-top:10px"><span class="info-label">المركز</span><span class="info-val">${rankTxt}</span></div>` : ''}
     ${s.notes?`<div class="info-row"><span class="info-label">ملاحظات</span><span class="info-val">${s.notes}</span></div>`:''}
     ${s.phone!=='none'?`<hr style="border-color:var(--border);margin:12px 0"><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
       <button class="btn btn-sm" style="background:rgba(37,211,102,0.15);color:#25d366;border:1px solid rgba(37,211,102,0.3)" onclick="sendWelcomeWA('${s.id}')"><i class="fab fa-whatsapp"></i> ترحيب</button>
@@ -4090,6 +4118,7 @@ function isPrivateType(type) {
 function typeLabel(type) {
   if (type === 'private') return { text:'برايفيت', icon:'🏠', badge:'badge-info' };
   if (type === 'home')    return { text:'برايفيت منزل', icon:'🚗', badge:'badge-warning' };
+  if (type === 'exams-only') return { text:'امتحانات فقط', icon:'📝', badge:'badge-secondary' };
   return { text:'سنتر', icon:'🏫', badge:'badge-secondary' };
 }
 
@@ -4135,13 +4164,26 @@ function formatMonthLabel(monthKey) {
   const [y, m] = monthKey.split('_');
   return `${MONTHS_AR[parseInt(m)-1]} ${y}`;
 }
+// Cache للـranks عشان نقلل الحسابات
+window._ranksCache = {};
+
 function computeRanks(monthKey) {
+  // لو الـranks محسوبة من قبل، نرجعها مباشرة
+  const cacheKey = monthKey || currentMonth;
+  if (window._ranksCache[cacheKey]) {
+    return window._ranksCache[cacheKey];
+  }
+  
   const md = monthKey === currentMonth ? monthData : {};
   const allExamMaxScores = window._examMaxScoresByGrade || {};
   const result = {};
   GRADES.forEach(grade => {
-    // Exclude students who left
-    const gradeStudents = Object.values(students).filter(s => s.grade === grade && (s.status||'active') === 'active');
+    // Exclude students who left & exams-only students
+    const gradeStudents = Object.values(students).filter(s => 
+      s.grade === grade && 
+      (s.status||'active') === 'active' &&
+      s.type !== 'exams-only' // استبعاد طلاب الامتحانات فقط
+    );
     const gradeMaxScores = allExamMaxScores[grade] || {};
     
     const scored = gradeStudents.map(s => {
@@ -4160,7 +4202,15 @@ function computeRanks(monthKey) {
     scored.sort((a,b) => b.score - a.score);
     result[grade] = scored;
   });
+  
+  // حفظ في الـcache
+  window._ranksCache[cacheKey] = result;
   return result;
+}
+
+// دالة لمسح الـcache (بنستخدمها بعد تحديث الدرجات)
+function clearRanksCache() {
+  window._ranksCache = {};
 }
 </script>
 
@@ -4259,6 +4309,7 @@ function computeRanksSync(monthKey) {
 // =============================================
 function renderAttendanceTable() {
   const grade = document.getElementById('attGradeFilter')?.value || '';
+  const type = document.getElementById('attTypeFilter')?.value || '';
   const tbody = document.getElementById('attendanceBody');
   if (!tbody) return;
   
@@ -4284,6 +4335,12 @@ function renderAttendanceTable() {
     window._examMaxScoresByGrade = allScoresSnap.val() || {};
     
     let rows = Object.values(students).filter(s => s.grade === grade && (s.status||'active') === 'active');
+    
+    // فلترة حسب النوع
+    if (type) {
+      rows = rows.filter(s => s.type === type);
+    }
+    
     // فلتر حسب نوع المساعد
     rows = _filterByAssistantType(rows);
     rows.sort((a,b) => (a.name||'').localeCompare(b.name||'','ar'));
@@ -4291,12 +4348,13 @@ function renderAttendanceTable() {
     // Build rows using buildAttRow
     tbody.innerHTML = rows.length
       ? rows.map(s => buildAttRow(s)).join('')
-      : `<tr><td colspan="12"><div class="empty-state"><i class="fas fa-users"></i><p>لا يوجد طلاب في هذا الصف</p></div></td></tr>`;
+      : `<tr><td colspan="12"><div class="empty-state"><i class="fas fa-users"></i><p>لا يوجد طلاب ${type ? 'من هذا النوع ' : ''}في هذا الصف</p></div></td></tr>`;
 
     // Summary
     const sumEl = document.getElementById('attSummary');
     sumEl.style.display = 'block';
-    sumEl.textContent = `حضر ${rows.filter(s => countAttendance(monthData[s.id]||{}) > 0).length} من ${rows.length} طالب — صف ${grade}`;
+    const typeText = type ? ` (${typeLabel({type}).text})` : '';
+    sumEl.textContent = `حضر ${rows.filter(s => countAttendance(monthData[s.id]||{}) > 0).length} من ${rows.length} طالب${typeText} — صف ${grade}`;
   });
 }
 
@@ -4359,11 +4417,26 @@ function buildAttRow(s) {
   const exams = md.exams || {};
   const attendCount = countAttendance(md);
   const studentGrade = s.grade; // المرحلة الخاصة بالطالب
+  const isExamsOnlyStudent = s.type === 'exams-only'; // طالب امتحانات فقط
   
   let sessCells = '';
   for (let i = 1; i <= 8; i++) {
     const v = sess[`s${i}`];
     sessCells += `<td><button class="sess-btn ${v===true?'present':v===false?'absent':''}" onclick="toggleSession('${s.id}',${i})">${i}</button></td>`;
+  }
+  
+  // لو طالب امتحانات فقط، نخفي كل الامتحانات
+  if (isExamsOnlyStudent) {
+    const examInputs = Array(8).fill(`<input type="text" class="exam-inp" value="-" disabled title="لا يوجد امتحانات لهذا الطالب">`).join('');
+    const scoreCell = '<span style="color:var(--text-muted)">-</span>';
+    
+    return `<tr>
+      <td><strong>${s.name}</strong> <span style="font-size:0.7rem;color:var(--warning)">📝</span></td>
+      <td><code style="background:var(--bg-card2);padding:2px 6px;border-radius:4px;font-size:0.8rem">${s.customCode||'-'}</code></td>
+      ${sessCells}
+      <td><div class="exam-inputs">${examInputs}</div>${scoreCell}</td>
+      <td><span class="badge ${attendCount>0?'badge-success':'badge-secondary'}">${attendCount}/8</span></td>
+    </tr>`;
   }
   
   // حساب المجموع الفعلي بناءً على الدرجات المُحددة لهذه المرحلة
@@ -4442,6 +4515,9 @@ function saveExamScore(studentId, examNum, val) {
   
   const ref = db.ref(`monthData/${currentMonth}/${studentId}/exams/e${examNum}`);
   if (v === null) { ref.remove(); } else { ref.set(v); }
+  
+  // مسح الـcache عشان الترتيب يتحدث
+  clearRanksCache();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -6011,10 +6087,17 @@ function buildParentStudentCard(id) {
   if (!s) return '';
   const md = monthData[id] || {};
   const attendance = countAttendance(md);
-  const ranks = computeRanks(currentMonth);
-  const gradeRanks = ranks[s.grade] || [];
-  const rankIdx = gradeRanks.findIndex(r => r.id === id);
-  const rankTxt = getRankText(rankIdx, s.grade, false, s);
+  const isExamsOnlyStudent = s.type === 'exams-only'; // طالب امتحانات فقط
+  
+  // لو طالب امتحانات فقط، مانعرضش الترتيب ولا الدرجات
+  let rankTxt = '<span style="color:var(--text-muted)">-</span>';
+  let rankIdx = -1;
+  if (!isExamsOnlyStudent) {
+    const ranks = computeRanks(currentMonth);
+    const gradeRanks = ranks[s.grade] || [];
+    rankIdx = gradeRanks.findIndex(r => r.id === id);
+    rankTxt = getRankText(rankIdx, s.grade, false, s);
+  }
 
   // درجات — grid واضح بدل badges متلاصقة + عرض الدرجة القصوى الصحيحة
   // تحميل إعدادات الدرجات للمرحلة
@@ -6024,31 +6107,37 @@ function buildParentStudentCard(id) {
   let totalScore = 0;
   let totalMaxScore = 0;
   
-  let scoresHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
-  for (let i = 1; i <= 8; i++) {
-    const v = md.exams?.[`e${i}`];
-    const hasVal = v != null && v !== '';
-    const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
-    
-    // حساب المجموع
-    if (hasVal) totalScore += parseFloat(v) || 0;
-    if (maxScore > 0) totalMaxScore += maxScore;
-    
-    // حساب النسبة المئوية لتحديد اللون
-    const percentage = hasVal ? (parseFloat(v) / maxScore * 100) : 0;
-    const color = hasVal ? (percentage >= 70 ? 'var(--success)' : percentage >= 50 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-muted)';
-    
-    // إخفاء الامتحان لو الدرجة القصوى = 0 (يعني مفيش امتحان)
-    if (maxScore === 0) continue;
-    
-    scoresHtml += `
-      <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center">
-        <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">اختبار ${i}</div>
-        <div style="font-size:1.1rem;font-weight:800;color:${color}">${hasVal ? v : '—'}</div>
-        <div style="font-size:0.68rem;color:var(--text-muted)">/ ${maxScore}</div>
-      </div>`;
+  let scoresHtml = '';
+  if (isExamsOnlyStudent) {
+    // إخفاء الامتحانات لطلاب "امتحانات فقط"
+    scoresHtml = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.9rem">📝 طالب امتحانات فقط - لا توجد درجات</div>';
+  } else {
+    scoresHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
+    for (let i = 1; i <= 8; i++) {
+      const v = md.exams?.[`e${i}`];
+      const hasVal = v != null && v !== '';
+      const maxScore = gradeMaxScores[`e${i}`] != null ? gradeMaxScores[`e${i}`] : 10;
+      
+      // حساب المجموع
+      if (hasVal) totalScore += parseFloat(v) || 0;
+      if (maxScore > 0) totalMaxScore += maxScore;
+      
+      // حساب النسبة المئوية لتحديد اللون
+      const percentage = hasVal ? (parseFloat(v) / maxScore * 100) : 0;
+      const color = hasVal ? (percentage >= 70 ? 'var(--success)' : percentage >= 50 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-muted)';
+      
+      // إخفاء الامتحان لو الدرجة القصوى = 0 (يعني مفيش امتحان)
+      if (maxScore === 0) continue;
+      
+      scoresHtml += `
+        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center">
+          <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">اختبار ${i}</div>
+          <div style="font-size:1.1rem;font-weight:800;color:${color}">${hasVal ? v : '—'}</div>
+          <div style="font-size:0.68rem;color:var(--text-muted)">/ ${maxScore}</div>
+        </div>`;
+    }
+    scoresHtml += '</div>';
   }
-  scoresHtml += '</div>';
 
   // حضور — grid واضح
   let sessHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
@@ -6142,7 +6231,7 @@ function buildParentStudentCard(id) {
       <div class="parent-card-body">
         <div style="font-size:0.85rem;color:var(--accent);font-weight:700;margin-bottom:10px">📅 ${formatMonthLabel(currentMonth)}</div>
         <div class="info-row"><span class="info-label">الحضور</span><span class="info-val">${attendance}/8 حصص</span></div>
-        <div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore.toFixed(1)}/${totalMaxScore}</span></div>
+        ${!isExamsOnlyStudent ? `<div class="info-row"><span class="info-label">مجموع الدرجات</span><span class="info-val">${totalScore.toFixed(1)}/${totalMaxScore}</span></div>` : ''}
         ${isPrivateType(s.type)?`
           <div class="info-row" style="background:rgba(79,142,247,0.08);padding:8px 10px;border-radius:8px;border:1px solid rgba(79,142,247,0.2)">
             <span class="info-label" style="color:var(--accent);font-weight:700"><i class="fas fa-money-bill-wave"></i> سعر الاشتراك الشهري</span>
@@ -6151,14 +6240,13 @@ function buildParentStudentCard(id) {
           <div class="info-row"><span class="info-label">حالة الدفع</span><span class="info-val">${md.paid?`<span class="badge badge-success">مدفوع ${md.payDate||''}</span>`:'<span class="badge badge-danger">غير مدفوع</span>'}</span></div>
         `:''}
         ${!isPrivateType(s.type) && s.type === 'center'?`<div class="info-row"><span class="info-label">السنتر</span><span class="info-val">${s.centerName || '—'}</span></div>`:''}
-        ${rankIdx >= 0 && rankIdx < 3
+        ${!isExamsOnlyStudent ? (rankIdx >= 0 && rankIdx < 3
           ? `<div style="margin:12px 0;padding:12px 14px;background:linear-gradient(135deg,rgba(240,192,64,0.15),rgba(240,192,64,0.05));border:1px solid rgba(240,192,64,0.4);border-radius:10px;text-align:center;font-weight:800;font-size:1rem;color:var(--gold)">${rankTxt}</div>`
-          : `<div style="margin:12px 0;padding:12px 14px;background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:10px;text-align:center;font-size:0.9rem;color:var(--text-secondary)">${rankTxt}</div>`
-        }
+          : `<div style="margin:12px 0;padding:12px 14px;background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:10px;text-align:center;font-size:0.9rem;color:var(--text-secondary)">${rankTxt}</div>`) : ''}
         <hr style="border-color:var(--border);margin:10px 0">
         <div style="color:var(--text-secondary);font-size:0.82rem;font-weight:600;margin-bottom:4px"><i class="fas fa-clipboard-check" style="color:var(--accent)"></i> الحضور التفصيلي</div>
         ${sessHtml}
-        <div style="color:var(--text-secondary);font-size:0.82rem;font-weight:600;margin-top:14px;margin-bottom:4px"><i class="fas fa-star" style="color:var(--warning)"></i> الدرجات</div>
+        ${!isExamsOnlyStudent ? `<div style="color:var(--text-secondary);font-size:0.82rem;font-weight:600;margin-top:14px;margin-bottom:4px"><i class="fas fa-star" style="color:var(--warning)"></i> الدرجات</div>` : ''}
         ${scoresHtml}
         ${scheduleSection}
         ${waGroupSection}
