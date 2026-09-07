@@ -54,6 +54,10 @@
       <button class="btn btn-primary" style="width:100%" onclick="doTeacherLogin()"><i class="fas fa-sign-in-alt"></i> دخول</button>
     </div>
     <div id="parentLoginForm" style="display:none">
+      <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.25);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;font-size:0.85rem;color:var(--text-secondary)">
+        <i class="fas fa-shield-check" style="color:var(--accent)"></i>
+        <strong>نظام التحقق:</strong> سيُطلب منك إدخال آخر 4 أرقام من رقم الواتساب المسجل للتأكد من هويتك
+      </div>
       <div style="display:flex;background:var(--bg-secondary);border-radius:var(--radius-sm);padding:3px;margin-bottom:14px;gap:2px">
         <button id="parentByPhone" class="btn btn-primary" style="flex:1;font-size:0.85rem;padding:7px" onclick="switchParentSearch('phone')">
           <i class="fas fa-phone"></i> رقم الواتساب
@@ -1170,6 +1174,9 @@ let scannerRunning = false;
 // INIT
 // =============================================
 window.onload = () => {
+  // مسح أي نوافذ منبثقة قديمة عند تحميل الصفحة
+  closeParentVerifyModal();
+  
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth() + 1;
   // Valid months in our system: Aug(8)→Jul(7) — all 12 months shown
@@ -1294,6 +1301,9 @@ function hideSplash(auto) {
 // AUTH
 // =============================================
 function switchLoginTab(tab) {
+  // مسح أي نافذة تحقق لولي أمر لما اليوزر يغير التبويبة
+  closeParentVerifyModal();
+  
   const btns = document.querySelectorAll('.tab-switch button');
   btns[0].classList.toggle('active', tab === 'teacher');
   btns[1].classList.toggle('active', tab === 'parent');
@@ -1305,6 +1315,9 @@ function switchLoginTab(tab) {
 }
 
 function doTeacherLogin() {
+  // مسح أي نافذة تحقق لولي أمر (لو موجودة)
+  closeParentVerifyModal();
+  
   const phone = document.getElementById('loginPhone').value.trim();
   const pass = document.getElementById('loginPass').value.trim();
   const err = document.getElementById('loginErr');
@@ -1414,43 +1427,138 @@ function switchParentSearch(mode) {
 
 function doParentLogin() {
   const err = document.getElementById('loginErr');
+  err.style.display = 'none'; // إخفاء الأخطاء السابقة
+  err.style.color = ''; // إعادة اللون الافتراضي
+  
   // تحديد وضع البحث
   const codeFieldVisible = document.getElementById('parentCodeField').style.display !== 'none';
 
   if (codeFieldVisible) {
     // بحث بكود الطالب
     const code = (document.getElementById('parentCodeInput').value || '').trim();
-    if (!code) { err.textContent = 'أدخل كود الطالب'; err.style.display = 'block'; return; }
+    console.log('🔍 Parent login by code:', code);
     
-    db.ref('students').once('value', snap => {
+    if (!code) { 
+      err.textContent = 'من فضلك أدخل كود الطالب'; 
+      err.style.display = 'block'; 
+      return; 
+    }
+    
+    // عرض مؤشر التحميل
+    err.textContent = 'جاري البحث...';
+    err.style.display = 'block';
+    err.style.color = '#4f8ef7';
+    
+    db.ref('students').once('value').then(snap => {
       const allStudents = snap.val() || {};
-      const found = Object.values(allStudents).find(s => s.customCode === code);
-      if (!found) { err.textContent = 'لا يوجد طالب بهذا الكود'; err.style.display = 'block'; return; }
+      console.log('📊 Total students in database:', Object.keys(allStudents).length);
       
+      const foundEntries = Object.entries(allStudents).filter(([id, s]) => {
+        const match = s && s.customCode && s.customCode.trim() === code;
+        if (match) console.log('✅ Found student:', s.name, 'ID:', id);
+        return match;
+      });
+      
+      console.log('🎯 Search results:', foundEntries.length);
+      
+      if (foundEntries.length === 0) { 
+        console.log('❌ No student found with code:', code);
+        err.textContent = 'لا يوجد طالب بهذا الكود. تأكد من الكود وحاول مرة أخرى.'; 
+        err.style.display = 'block'; 
+        err.style.color = '';
+        return; 
+      }
+      
+      // إخفاء رسالة البحث
       err.style.display = 'none';
+      err.style.color = '';
       
       // إظهار نافذة التحقق من آخر 4 أرقام
-      showParentVerificationModal(found);
+      const [studentId, studentData] = foundEntries[0];
+      studentData.id = studentId;
+      console.log('📱 Student phone:', studentData.phone);
+      
+      // تأخير بسيط عشان اليوزر يشوف إن البحث نجح
+      setTimeout(() => {
+        showParentVerificationModal(studentData);
+      }, 300);
+    }).catch(error => {
+      console.error('❌ Error fetching student:', error);
+      err.textContent = 'حدث خطأ في الاتصال. حاول مرة أخرى.';
+      err.style.display = 'block';
+      err.style.color = '';
     });
   } else {
     // بحث برقم الواتساب
     const phone = (document.getElementById('parentPhone').value || '').trim();
-    if (!phone) { err.textContent = 'أدخل رقم الواتساب'; err.style.display = 'block'; return; }
-    db.ref('students').orderByChild('phone').equalTo(phone).once('value', snap => {
+    console.log('🔍 Parent login by phone:', phone);
+    
+    if (!phone) { 
+      err.textContent = 'من فضلك أدخل رقم الواتساب'; 
+      err.style.display = 'block'; 
+      return; 
+    }
+    
+    // عرض مؤشر التحميل
+    err.textContent = 'جاري البحث...';
+    err.style.display = 'block';
+    err.style.color = '#4f8ef7';
+    
+    db.ref('students').orderByChild('phone').equalTo(phone).once('value').then(snap => {
       const data = snap.val();
-      if (!data) { err.textContent = 'لا يوجد طالب مسجل بهذا الرقم'; err.style.display = 'block'; return; }
+      console.log('📊 Search by phone results:', data ? Object.keys(data).length : 0);
+      
+      if (!data) { 
+        console.log('❌ No student found with phone:', phone);
+        err.textContent = 'لا يوجد طالب مسجل بهذا الرقم. تأكد من الرقم وحاول مرة أخرى.'; 
+        err.style.display = 'block'; 
+        err.style.color = '';
+        return; 
+      }
       const ids = Object.keys(data);
-      parentStudentIds = ids;
-      parentStudentId  = ids[0];
-      const label = ids.length > 1 ? `أولادي (${ids.length})` : data[ids[0]].name;
-      _enterParentMode(label);
+      
+      // إخفاء رسالة البحث
+      err.style.display = 'none';
+      err.style.color = '';
+      
+      // إظهار نافذة التحقق من آخر 4 أرقام (أول طالب بس للتحقق)
+      const firstStudent = data[ids[0]];
+      firstStudent.id = ids[0];
+      
+      console.log('✅ Found students:', ids.length, '- First student:', firstStudent.name);
+      
+      // حفظ كل الأولاد عشان بعد التحقق ندخلهم كلهم
+      window._pendingParentStudents = ids;
+      
+      // تأخير بسيط عشان اليوزر يشوف إن البحث نجح
+      setTimeout(() => {
+        showParentVerificationModal(firstStudent);
+      }, 300);
+    }).catch(error => {
+      console.error('❌ Error fetching student:', error);
+      err.textContent = 'حدث خطأ في الاتصال. حاول مرة أخرى.';
+      err.style.display = 'block';
+      err.style.color = '';
     });
   }
 }
 
 function showParentVerificationModal(student) {
+  console.log('🔐 Opening verification modal for student:', student.name, '- Phone:', student.phone);
+  
+  // التأكد إن شاشة تسجيل الدخول مفتوحة (ولي الأمر لسه مسجلش دخول)
+  const loginScreen = document.getElementById('loginScreen');
+  if (!loginScreen || loginScreen.style.display === 'none') {
+    console.error('❌ Login screen is not visible! Modal will not be shown.');
+    return;
+  }
+  
+  // مسح أي modal قديمة
   const existing = document.getElementById('parentVerifyModal');
-  if (existing) existing.remove();
+  if (existing) {
+    console.log('⚠️ Removing existing modal');
+    existing.remove();
+  }
   
   const modal = document.createElement('div');
   modal.id = 'parentVerifyModal';
@@ -1458,8 +1566,8 @@ function showParentVerificationModal(student) {
   modal.innerHTML = `
     <div class="modal modal-sm">
       <div class="modal-header">
-        <span class="modal-title"><i class="fas fa-shield-alt" style="color:var(--accent)"></i> التحقق من الهوية</span>
-        <button class="modal-close" onclick="document.getElementById('parentVerifyModal').remove()"><i class="fas fa-times"></i></button>
+        <span class="modal-title"><i class="fas fa-shield-alt" style="color:var(--accent)"></i> التحقق من هوية ولي الأمر</span>
+        <button class="modal-close" onclick="closeParentVerifyModal()"><i class="fas fa-times"></i></button>
       </div>
       <div style="text-align:center;margin-bottom:20px">
         <div style="width:80px;height:80px;margin:0 auto 16px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--success));display:flex;align-items:center;justify-content:center;font-size:2.5rem">
@@ -1468,71 +1576,210 @@ function showParentVerificationModal(student) {
         <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;color:var(--text-primary)">
           ولي أمر: ${student.name}
         </div>
-        <div style="font-size:0.85rem;color:var(--text-secondary)">
-          للتأكد من هويتك، أدخل آخر 4 أرقام من رقم الواتساب المسجل
+        <div style="background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.3);border-radius:8px;padding:12px;margin:16px auto;font-size:0.85rem;color:var(--text-secondary);max-width:320px">
+          <i class="fas fa-info-circle" style="color:var(--accent)"></i>
+          للتأكد من هويتك كولي أمر، أدخل آخر 4 أرقام من رقم الواتساب المسجل في النظام
         </div>
       </div>
       <div class="form-group">
-        <label style="font-weight:600">آخر 4 أرقام من رقم الواتساب <span style="color:var(--danger)">*</span></label>
+        <label style="font-weight:600;font-size:0.95rem">
+          <i class="fas fa-key" style="color:var(--accent)"></i>
+          آخر 4 أرقام من رقم الواتساب <span style="color:var(--danger)">*</span>
+        </label>
         <input type="text" id="parentVerifyLast4" class="form-control" 
           placeholder="مثال: 6672" 
           maxlength="4"
-          style="text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:8px"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+          inputmode="numeric"
+          style="text-align:center;font-size:1.8rem;font-weight:700;letter-spacing:12px;padding:16px"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'');if(this.value.length===4){document.getElementById('parentVerifyError').style.display='none'}"
           onkeydown="if(event.key==='Enter' && this.value.length===4) verifyParentPhone('${student.id}')">
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;text-align:center">
-          <i class="fas fa-info-circle"></i> أدخل الأرقام الأربعة الأخيرة من رقمك المسجل
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;text-align:center">
+          <i class="fas fa-mobile-alt"></i> مثال: لو رقمك 01112996672، اكتب 6672
         </div>
       </div>
-      <div id="parentVerifyError" style="display:none;background:var(--danger-bg);border:1px solid var(--danger);border-radius:8px;padding:10px;margin-bottom:12px;text-align:center;color:var(--danger);font-size:0.85rem"></div>
-      <div class="modal-footer" style="justify-content:center;gap:8px">
-        <button class="btn btn-secondary" onclick="document.getElementById('parentVerifyModal').remove()">
+      <div id="parentVerifyError" style="display:none;background:rgba(248,81,73,0.1);border:1px solid var(--danger);border-radius:8px;padding:12px;margin-bottom:12px;text-align:center;color:var(--danger);font-size:0.85rem;font-weight:600"></div>
+      <div class="modal-footer" style="justify-content:center;gap:10px">
+        <button class="btn btn-secondary" onclick="closeParentVerifyModal()">
           <i class="fas fa-times"></i> إلغاء
         </button>
-        <button class="btn btn-primary" onclick="verifyParentPhone('${student.id}')" style="min-width:120px">
-          <i class="fas fa-check"></i> تأكيد
+        <button class="btn btn-primary" onclick="verifyParentPhone('${student.id}')" style="min-width:140px;font-weight:700">
+          <i class="fas fa-check-circle"></i> تحقق ودخول
         </button>
       </div>
     </div>`;
   
   document.body.appendChild(modal);
-  setTimeout(() => document.getElementById('parentVerifyLast4').focus(), 100);
+  console.log('✅ Modal appended to body');
+  
+  setTimeout(() => {
+    const input = document.getElementById('parentVerifyLast4');
+    if (input) {
+      input.focus();
+      console.log('✅ Input focused');
+    } else {
+      console.error('❌ Input element not found');
+    }
+  }, 100);
+}
+
+// وظيفة جديدة لإغلاق نافذة التحقق
+function closeParentVerifyModal() {
+  console.log('🚪 Closing parent verification modal');
+  const modal = document.getElementById('parentVerifyModal');
+  if (modal) {
+    modal.remove();
+    console.log('✅ Modal removed');
+  }
+  
+  // مسح أي بيانات مؤقتة
+  window._pendingParentStudents = null;
 }
 
 function verifyParentPhone(studentId) {
+  console.log('🔐 Verifying parent phone for student ID:', studentId);
+  
   const last4 = (document.getElementById('parentVerifyLast4')?.value || '').trim();
   const errEl = document.getElementById('parentVerifyError');
+  const inputEl = document.getElementById('parentVerifyLast4');
   
-  if (!last4 || last4.length !== 4) {
-    errEl.textContent = 'يجب إدخال 4 أرقام';
-    errEl.style.display = 'block';
+  console.log('📝 Entered last 4 digits:', last4);
+  
+  // مسح الأخطاء السابقة
+  if (errEl) errEl.style.display = 'none';
+  
+  if (!last4) {
+    console.log('❌ No digits entered');
+    if (errEl) {
+      errEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> من فضلك أدخل آخر 4 أرقام من رقم الواتساب';
+      errEl.style.display = 'block';
+    }
+    if (inputEl) inputEl.focus();
     return;
   }
   
-  db.ref('students').once('value', snap => {
+  if (last4.length !== 4) {
+    console.log('❌ Invalid length:', last4.length);
+    if (errEl) {
+      errEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> يجب إدخال 4 أرقام بالضبط';
+      errEl.style.display = 'block';
+    }
+    if (inputEl) inputEl.focus();
+    return;
+  }
+  
+  // عرض مؤشر التحميل
+  console.log('⏳ Loading...');
+  if (errEl) {
+    errEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التحقق...';
+    errEl.style.display = 'block';
+    errEl.style.background = 'rgba(79,142,247,0.1)';
+    errEl.style.borderColor = 'var(--accent)';
+    errEl.style.color = 'var(--accent)';
+  }
+  
+  db.ref('students').once('value').then(snap => {
     const allStudents = snap.val() || {};
     const s = allStudents[studentId];
-    if (!s) return;
+    
+    console.log('📊 Student data:', s ? s.name : 'Not found');
+    
+    if (!s) {
+      console.error('❌ Student not found in database');
+      if (errEl) {
+        errEl.innerHTML = '<i class="fas fa-times-circle"></i> حدث خطأ. لم يتم العثور على بيانات الطالب.';
+        errEl.style.display = 'block';
+        errEl.style.background = 'rgba(248,81,73,0.1)';
+        errEl.style.borderColor = 'var(--danger)';
+        errEl.style.color = 'var(--danger)';
+      }
+      return;
+    }
     
     const studentPhone = s.phone || '';
     const studentLast4 = studentPhone.slice(-4);
     
-    if (studentPhone === 'none' || studentLast4 !== last4) {
-      errEl.innerHTML = '<i class="fas fa-times-circle"></i> الأرقام غير صحيحة<br><span style="font-size:0.8rem">تأكد من آخر 4 أرقام من رقم الواتساب المسجل</span>';
-      errEl.style.display = 'block';
-      
-      // تأثير اهتزاز للحقل
-      const input = document.getElementById('parentVerifyLast4');
-      input.style.animation = 'shake 0.5s';
-      setTimeout(() => { input.style.animation = ''; input.value = ''; input.focus(); }, 500);
+    console.log('📱 Student phone:', studentPhone);
+    console.log('🔢 Expected last 4:', studentLast4);
+    console.log('🔢 Entered last 4:', last4);
+    
+    // التحقق من الرقم
+    if (studentPhone === 'none' || studentPhone === '' || !studentPhone) {
+      console.log('❌ No phone registered');
+      if (errEl) {
+        errEl.innerHTML = '<i class="fas fa-times-circle"></i> لا يوجد رقم واتساب مسجل لهذا الطالب<br><span style="font-size:0.8rem">تواصل مع المعلم لتسجيل رقمك</span>';
+        errEl.style.display = 'block';
+        errEl.style.background = 'rgba(248,81,73,0.1)';
+        errEl.style.borderColor = 'var(--danger)';
+        errEl.style.color = 'var(--danger)';
+      }
       return;
     }
     
-    // نجح التحقق - الدخول لصفحة ولي الأمر
-    document.getElementById('parentVerifyModal').remove();
-    parentStudentIds = [s.id];
-    parentStudentId  = s.id;
-    _enterParentMode(s.name);
+    if (studentLast4 !== last4) {
+      console.log('❌ Verification failed - numbers do not match');
+      if (errEl) {
+        errEl.innerHTML = '<i class="fas fa-times-circle"></i> الأرقام غير صحيحة<br><span style="font-size:0.8rem">تأكد من آخر 4 أرقام من رقم الواتساب المسجل (مثال: لو رقمك 01112996672 اكتب 6672)</span>';
+        errEl.style.display = 'block';
+        errEl.style.background = 'rgba(248,81,73,0.1)';
+        errEl.style.borderColor = 'var(--danger)';
+        errEl.style.color = 'var(--danger)';
+      }
+      
+      // تأثير اهتزاز للحقل
+      if (inputEl) {
+        inputEl.style.animation = 'shake 0.5s';
+        setTimeout(() => { 
+          inputEl.style.animation = ''; 
+          inputEl.value = ''; 
+          inputEl.focus(); 
+        }, 500);
+      }
+      return;
+    }
+    
+    // ✅ نجح التحقق - الدخول لصفحة ولي الأمر
+    console.log('✅ Verification successful!');
+    if (errEl) {
+      errEl.innerHTML = '<i class="fas fa-check-circle"></i> تم التحقق بنجاح! جاري الدخول...';
+      errEl.style.display = 'block';
+      errEl.style.background = 'rgba(63,185,80,0.1)';
+      errEl.style.borderColor = 'var(--success)';
+      errEl.style.color = 'var(--success)';
+    }
+    
+    setTimeout(() => {
+      const modal = document.getElementById('parentVerifyModal');
+      if (modal) {
+        console.log('🚪 Closing verification modal');
+        modal.remove();
+      }
+      
+      // لو في أولاد تانيين محفوظين من البحث برقم الواتساب
+      const pendingStudents = window._pendingParentStudents;
+      if (pendingStudents && pendingStudents.length > 0) {
+        console.log('👨‍👩‍👦 Multiple students found:', pendingStudents.length);
+        parentStudentIds = pendingStudents;
+        parentStudentId = pendingStudents[0];
+        const label = pendingStudents.length > 1 ? `أولادي (${pendingStudents.length})` : s.name;
+        window._pendingParentStudents = null; // مسح الـcache
+        _enterParentMode(label);
+      } else {
+        console.log('👤 Single student mode');
+        // بحث بالكود - طالب واحد بس
+        parentStudentIds = [studentId];
+        parentStudentId = studentId;
+        _enterParentMode(s.name);
+      }
+    }, 800);
+  }).catch(error => {
+    console.error('❌ Error verifying parent:', error);
+    if (errEl) {
+      errEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> حدث خطأ في الاتصال. حاول مرة أخرى.';
+      errEl.style.display = 'block';
+      errEl.style.background = 'rgba(248,81,73,0.1)';
+      errEl.style.borderColor = 'var(--danger)';
+      errEl.style.color = 'var(--danger)';
+    }
   });
 }
 
@@ -1625,6 +1872,9 @@ let examsData        = {};
 
 // login الطالب
 function doStudentLogin() {
+  // مسح أي نافذة تحقق لولي أمر (لو موجودة)
+  closeParentVerifyModal();
+  
   const code = (document.getElementById('studentCodeLogin')?.value || '').trim();
   const err  = document.getElementById('loginErr');
   
