@@ -6000,12 +6000,33 @@ function calcReconcile() {
 
   const targetDate = new Date(dateVal).toLocaleDateString('ar-EG');
 
-  // كل الإيرادات المسجلة لهذا اليوم (تلقائية ويدوية معاً — بدون تكرار)
-  const allList = Object.values(centerIncomes).filter(inc => inc.date === targetDate);
-  const systemTotal = allList.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
+  // كل الإيرادات المسجلة لهذا اليوم
+  const allIncomes = Object.values(centerIncomes).filter(inc => inc.date === targetDate);
+  
+  // تصفية الإيرادات: فقط اللي من مدفوعات فعلية أو يدوية صحيحة
+  const validIncomes = allIncomes.filter(inc => {
+    // لو إيراد يدوي (مش autoFromPay) → يعتبر صالح
+    if (!inc.autoFromPay) return true;
+    
+    // لو إيراد تلقائي من دفع طالب → نتأكد إن الطالب فعلاً مدفوع
+    if (inc.studentId && inc.month) {
+      const monthKey = inc.month; // مثال: "2025-01"
+      const md = monthData[monthKey];
+      if (!md || !md[inc.studentId]) return false; // مفيش بيانات للطالب
+      
+      const studentPayment = md[inc.studentId].payment;
+      // نتأكد إن في دفعة مسجلة
+      return studentPayment && studentPayment.amount > 0;
+    }
+    
+    // لو مفيش studentId أو month → نعتبره صالح (احتياطاً)
+    return true;
+  });
 
-  const autoItems   = allList.filter(i =>  i.autoFromPay);
-  const manualItems = allList.filter(i => !i.autoFromPay);
+  const systemTotal = validIncomes.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
+
+  const autoItems   = validIncomes.filter(i =>  i.autoFromPay);
+  const manualItems = validIncomes.filter(i => !i.autoFromPay);
   const diff    = actual - systemTotal;
   const isMatch = Math.abs(diff) < 0.01;
 
