@@ -3928,53 +3928,143 @@ function confirmPay() {
   if (!pendingPayId) return;
   const id = pendingPayId;
   const s = students[id];
+  
+  if (!s || !isPrivateType(s.type)) {
+    toast('خطأ: طالب غير صالح','error');
+    return;
+  }
+  
+  // 1. التحقق من إن الطالب مدفعش قبل كده
+  const md = monthData[currentMonth]?.[id] || {};
+  if (md.paid) {
+    toast('⚠️ الطالب مدفوع بالفعل!','warning');
+    closeModal('payModal');
+    pendingPayId = null;
+    return;
+  }
+  
+  // 2. التحقق من إن مفيش إيراد مسجل قبل كده لنفس الطالب في نفس الشهر
+  const [cy, cm] = currentMonth.split('_');
+  const existingIncome = Object.values(centerIncomes).find(inc => 
+    inc.autoFromPay && inc.studentId === id && inc.year === cy && inc.month === cm
+  );
+  
+  if (existingIncome) {
+    toast('⚠️ يوجد إيراد مسجل مسبقاً لهذا الطالب في هذا الشهر!','warning');
+    closeModal('payModal');
+    pendingPayId = null;
+    return;
+  }
+  
   const today = new Date().toLocaleDateString('ar-EG');
+  
+  // 3. تسجيل الدفع أولاً
   db.ref(`monthData/${currentMonth}/${id}`).update({ paid: true, payDate: today })
     .then(() => {
       playPaySound();
-      toast('تم تسجيل الدفع بنجاح','success');
+      toast('✅ تم تسجيل الدفع بنجاح','success');
       closeModal('payModal');
       pendingPayId = null;
-      // ← إضافة إيراد تلقائي في الخزنة
-      if (s && isPrivateType(s.type) && !s.feeExempt && s.monthlyFee > 0) {
-        const incId = db.ref('centerIncomes').push().key;
-        const tl = typeLabel(s.type);
-        db.ref(`centerIncomes/${incId}`).set({
-          id: incId,
-          desc: `مصاريف ${s.name} — ${tl.text} — ${s.grade}`,
-          amount: s.monthlyFee,
-          month: currentMonth.split('_')[1],
-          year:  currentMonth.split('_')[0],
-          date:  today,
-          autoFromPay: true,
-          studentId: id
-        });
+      
+      // 4. تسجيل الإيراد في الخزنة (بعد التأكد من نجاح الدفع)
+      if (s.feeExempt || !s.monthlyFee || s.monthlyFee <= 0) {
+        // طالب معفي أو مفيش مصاريف → مفيش داعي لتسجيل إيراد
+        return;
       }
+      
+      const incId = db.ref('centerIncomes').push().key;
+      const tl = typeLabel(s.type);
+      
+      db.ref(`centerIncomes/${incId}`).set({
+        id: incId,
+        desc: `مصاريف ${s.name} — ${tl.text} — ${s.grade}`,
+        amount: s.monthlyFee,
+        month: cm,
+        year: cy,
+        date: today,
+        autoFromPay: true,
+        studentId: id
+      }).catch(err => {
+        console.error('خطأ في تسجيل الإيراد:', err);
+        toast('⚠️ تم تسجيل الدفع لكن فشل تسجيل الإيراد','warning');
+      });
     })
-    .catch(e => toast('خطأ','error'));
+    .catch(e => {
+      console.error('خطأ في تسجيل الدفع:', e);
+      toast('❌ فشل تسجيل الدفع','error');
+    });
 }
 
 function confirmUnpay(id) {
   const s = students[id];
-  if (!s) return;
-  if (!confirm(`هل تريد إلغاء تسجيل دفع "${s.name}" لشهر ${formatMonthLabel(currentMonth)}؟\nهذا الإجراء قابل للتراجع.`)) return;
-  db.ref(`monthData/${currentMonth}/${id}`).update({ paid: false, payDate: null })
-    .then(() => {
-      toast('تم إلغاء تسجيل الدفع','warning');
-      // ← مسح الإيراد التلقائي المرتبط بهذا الطالب في نفس الشهر
-      _removeAutoIncomeForStudent(id);
-    })
-    .catch(() => toast('خطأ في الإلغاء','error'));
-}
-
-// مسح الإيراد التلقائي لطالب في الشهر الحالي
-function _removeAutoIncomeForStudent(studentId) {
-  const [cy, cm] = currentMonth.split('_');
-  Object.entries(centerIncomes).forEach(([incId, inc]) => {
-    if (inc.autoFromPay && inc.studentId === studentId && inc.year === cy && inc.month === cm) {
-      db.ref(`centerIncomes/${incId}`).remove();
+  if (!s) {
+    toast('خطأ: طالب غير موجود','error');
+    return;
+  }
+  
+  // البحث في الشهر الحالي أولاً
+  let targetMonth = currentMonth;
+  let md = monthData[currentMonth]?.[id];
+  
+  // لو مش موجود في الشهر الحالي، ندور في كل الشهور
+  if (!md || !md.paid) {
+    const allMonths = Object.keys(monthData);
+    let found = false;
+    
+    for (const month of allMonths) {
+      const data = monthData[month]?.[id];
+      if (data && data.paid) {
+        targetMonth = month;
+        md = data;
+        found = true;
+        break; // أول شهر لاقيناه فيه مدفوع
+      }
     }
-  });
+    
+    if (!found) {
+      toast('⚠️ الطالب غير مدفوع في أي شهر','warning');
+      return;
+    }
+  }
+  
+  const monthLabel = formatMonthLabel(targetMonth);
+  const warningMsg = targetMonth !== currentMonth 
+    ? `⚠️ تنبيه: هذا الدفع من شهر ${monthLabel} (مش الشهر الحالي)\n\n`
+    : '';
+  
+  if (!confirm(`${warningMsg}هل تريد إلغاء تسجيل دفع "${s.name}" لشهر ${monthLabel}؟\n\nسيتم مسح الإيراد المرتبط من الخزنة.`)) {
+    return;
+  }
+  
+  // 1. إلغاء الدفع
+  db.ref(`monthData/${targetMonth}/${id}`).update({ paid: false, payDate: null })
+    .then(() => {
+      toast(`✅ تم إلغاء تسجيل الدفع من شهر ${monthLabel}`,'warning');
+      
+      // 2. مسح الإيراد التلقائي المرتبط
+      const [cy, cm] = targetMonth.split('_');
+      const incomesToRemove = Object.entries(centerIncomes).filter(([incId, inc]) => 
+        inc.autoFromPay && inc.studentId === id && inc.year === cy && inc.month === cm
+      );
+      
+      if (incomesToRemove.length > 0) {
+        console.log(`🗑️ Removing ${incomesToRemove.length} auto income(s) for student ${id} from ${targetMonth}`);
+        incomesToRemove.forEach(([incId, inc]) => {
+          db.ref(`centerIncomes/${incId}`).remove()
+            .then(() => console.log(`✅ Removed income ${incId}: ${inc.desc}`))
+            .catch(err => console.error(`❌ Failed to remove income ${incId}:`, err));
+        });
+      } else {
+        console.log(`ℹ️ No auto incomes found for student ${id} in ${targetMonth}`);
+      }
+      
+      // إعادة تحميل البيانات
+      loadAllData();
+    })
+    .catch(err => {
+      console.error('خطأ في إلغاء الدفع:', err);
+      toast('❌ فشل إلغاء الدفع','error');
+    });
 }
 </script>
 
@@ -5807,22 +5897,97 @@ function saveIncome() {
 function deleteIncome(id) {
   const inc = centerIncomes[id];
   if (!inc) return;
-  // لو كان إيراد تلقائي من دفع طالب — اسأل هل تلغي الدفع كمان
+  
+  // لو كان إيراد تلقائي من دفع طالب
   if (inc.autoFromPay && inc.studentId) {
     const s = students[inc.studentId];
     const sName = s?.name || 'الطالب';
+    
+    // التحقق من الشهر - لازم نتأكد إن الإيراد من نفس الشهر الحالي
+    const incMonth = `${inc.year}_${inc.month}`;
+    
+    if (incMonth !== currentMonth) {
+      // إيراد من شهر قديم - نحذفه بس بدون إلغاء الدفع
+      if (!confirm(`حذف إيراد "${sName}" من شهر ${inc.month}/${inc.year}؟\n\n⚠️ ملاحظة: هذا إيراد من شهر سابق - سيتم حذف الإيراد فقط دون المساس بحالة الدفع.`)) {
+        return;
+      }
+      db.ref(`centerIncomes/${id}`).remove()
+        .then(() => toast('تم حذف الإيراد','success'))
+        .catch(e => toast('خطأ في الحذف','error'));
+      return;
+    }
+    
+    // إيراد من الشهر الحالي - نسأل عن إلغاء الدفع
     const choice = confirm(
-      `هذا إيراد تلقائي من دفع "${sName}".\n\nاضغط "موافق" لحذف الإيراد وإلغاء تسجيل الدفع معاً.\nاضغط "إلغاء" للرجوع بدون حذف.`
+      `هذا إيراد تلقائي من دفع "${sName}" للشهر الحالي.\n\n✅ اضغط "موافق" لحذف الإيراد وإلغاء تسجيل الدفع معاً.\n❌ اضغط "إلغاء" للرجوع بدون حذف.`
     );
+    
     if (!choice) return;
-    // مسح الإيراد + إلغاء تسجيل الدفع
+    
+    // مسح الإيراد + إلغاء تسجيل الدفع للشهر الحالي فقط
     db.ref(`centerIncomes/${id}`).remove();
     db.ref(`monthData/${currentMonth}/${inc.studentId}`).update({ paid: false, payDate: null })
-      .then(() => toast('تم حذف الإيراد وإلغاء تسجيل الدفع','warning'));
+      .then(() => toast('تم حذف الإيراد وإلغاء تسجيل الدفع','warning'))
+      .catch(e => toast('خطأ في الحذف','error'));
     return;
   }
+  
+  // إيراد يدوي - حذف عادي
   if (!confirm('حذف هذا الإيراد؟')) return;
-  db.ref(`centerIncomes/${id}`).remove().then(() => toast('تم الحذف','success'));
+  db.ref(`centerIncomes/${id}`).remove()
+    .then(() => toast('تم الحذف','success'))
+    .catch(e => toast('خطأ في الحذف','error'));
+}
+
+// ===============================================
+// 🔧 استرجاع الدفعات من سجل الإيرادات
+// ===============================================
+function restorePaymentsFromIncomes() {
+  if (!confirm('⚠️ استرجاع الدفعات من سجل الإيرادات؟\n\nسيتم البحث عن كل الإيرادات التلقائية وتسجيل الدفع للطلاب المرتبطين بها.\n\nهل تريد المتابعة؟')) {
+    return;
+  }
+  
+  let restored = 0;
+  let errors = 0;
+  
+  // جمع كل الإيرادات التلقائية
+  const autoIncomes = Object.values(centerIncomes).filter(inc => inc.autoFromPay && inc.studentId);
+  
+  if (autoIncomes.length === 0) {
+    toast('لا توجد إيرادات تلقائية للاسترجاع','info');
+    return;
+  }
+  
+  toast(`جاري فحص ${autoIncomes.length} إيراد...`, 'info');
+  
+  const updates = {};
+  
+  autoIncomes.forEach(inc => {
+    const monthKey = `${inc.year}_${inc.month}`;
+    const studentId = inc.studentId;
+    
+    // التحقق من إن الطالب موجود
+    if (!students[studentId]) {
+      console.log(`⚠️ Student ${studentId} not found`);
+      return;
+    }
+    
+    // تسجيل الدفع
+    updates[`monthData/${monthKey}/${studentId}/paid`] = true;
+    updates[`monthData/${monthKey}/${studentId}/payDate`] = inc.date;
+    restored++;
+  });
+  
+  // تنفيذ كل التحديثات دفعة واحدة
+  db.ref().update(updates)
+    .then(() => {
+      toast(`✅ تم استرجاع ${restored} دفعة بنجاح!`, 'success');
+      loadAllData(); // إعادة تحميل البيانات
+    })
+    .catch(err => {
+      console.error('خطأ في الاسترجاع:', err);
+      toast('❌ حدث خطأ في الاسترجاع', 'error');
+    });
 }
 
 function toggleIncomeList() {
