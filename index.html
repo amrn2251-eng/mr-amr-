@@ -3286,7 +3286,15 @@ function renderArchiveTable() {
   GRADES.forEach(g => {
     const gs = Object.values(archivedMonthData.students).filter(s => s.grade === g);
     gs.sort((a,b) => calcTotalScore(b.monthData||{}) - calcTotalScore(a.monthData||{}));
-    gs.forEach((s,i) => { ranks[s.customCode] = i; });
+    
+    // إضافة المركز الفعلي مع مراعاة التساوي
+    let currentRank = 1;
+    for (let i = 0; i < gs.length; i++) {
+      if (i > 0 && calcTotalScore(gs[i].monthData||{}) < calcTotalScore(gs[i-1].monthData||{})) {
+        currentRank = i + 1;
+      }
+      ranks[gs[i].customCode] = { rank: currentRank, index: i };
+    }
   });
   const rankEmoji = ['🥇','🥈','🥉'];
   container.innerHTML = `
@@ -3302,8 +3310,9 @@ function renderArchiveTable() {
             const md = s.monthData || {};
             const att = countAttendance(md);
             const score = calcTotalScore(md);
-            const rk = ranks[s.customCode];
-            const rkTxt = rk !== undefined && rk < 3 ? rankEmoji[rk] : '-';
+            const rankObj = ranks[s.customCode];
+            const actualRank = rankObj ? rankObj.rank : undefined;
+            const rkTxt = actualRank !== undefined && actualRank <= 3 ? rankEmoji[actualRank - 1] : (actualRank ? `#${actualRank}` : '-');
             const payTxt = s.type === 'private'
               ? (md.paid ? `<span class="badge badge-success">مدفوع ${md.payDate||''}</span>` : '<span class="badge badge-danger">غير مدفوع</span>')
               : '<span class="badge badge-secondary">سنتر</span>';
@@ -3403,7 +3412,11 @@ function loadIncomes() {
   return new Promise(resolve => {
     db.ref('centerIncomes').on('value', snap => {
       centerIncomes = snap.val() || {};
-      if (currentUser === 'admin') renderIncomes();
+      console.log(`📦 Loaded ${Object.keys(centerIncomes).length} incomes from Firebase`, centerIncomes);
+      // رندر الإيرادات مباشرة بدون شروط
+      if (currentUser === 'admin') {
+        setTimeout(() => renderIncomes(), 100);
+      }
       resolve();
     });
   });
@@ -3413,7 +3426,7 @@ function loadExpenses() {
   return new Promise(resolve => {
     db.ref('expenses').on('value', snap => {
       expenses = snap.val() || {};
-      if (currentUser === 'admin') renderIncomes();
+      console.log(`📦 Loaded ${Object.keys(expenses).length} expenses from Firebase`);
       resolve();
     });
   });
@@ -3970,8 +3983,10 @@ function confirmPay() {
   // 2. التحقق من إن مفيش إيراد مسجل قبل كده لنفس الطالب في نفس الشهر
   const [cy, cm] = currentMonth.split('_');
   const existingIncome = Object.values(centerIncomes).find(inc => {
-    const incMonth = parseInt(inc.month).toString(); // توحيد الصيغة
-    return inc.autoFromPay && inc.studentId === id && inc.year === cy && incMonth === cm;
+    const incMonth = inc.month ? parseInt(inc.month).toString() : '';
+    const cmPadded = cm.padStart(2, '0');
+    const monthMatch = incMonth === cm || inc.month === cm || inc.month === cmPadded;
+    return inc.autoFromPay && inc.studentId === id && inc.year === cy && monthMatch;
   });
   
   if (existingIncome) {
@@ -3982,7 +3997,9 @@ function confirmPay() {
     return;
   }
   
-  const today = new Date().toLocaleDateString('ar-EG');
+  // استخدام صيغة ISO للتاريخ (YYYY-MM-DD)
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   
   // 3. تسجيل الدفع أولاً
   db.ref(`monthData/${currentMonth}/${id}`).update({ paid: true, payDate: today })
@@ -4089,8 +4106,10 @@ function confirmUnpay(id) {
     // Try to find if student is paid in any other way
     const [cy, cm] = currentMonth.split('_');
     const hasIncome = Object.values(centerIncomes).some(inc => {
-      const incMonth = parseInt(inc.month).toString();
-      return inc.autoFromPay && inc.studentId === id && inc.year === cy && incMonth === cm;
+      const incMonth = inc.month ? parseInt(inc.month).toString() : '';
+      const cmPadded = cm.padStart(2, '0');
+      const monthMatch = incMonth === cm || inc.month === cm || inc.month === cmPadded;
+      return inc.autoFromPay && inc.studentId === id && inc.year === cy && monthMatch;
     });
     
     if (hasIncome) {
@@ -4125,8 +4144,10 @@ function confirmUnpay(id) {
       // 2. مسح الإيراد التلقائي المرتبط
       const [cy, cm] = currentMonth.split('_');
       const incomesToRemove = Object.entries(centerIncomes).filter(([incId, inc]) => {
-        const incMonth = parseInt(inc.month).toString(); // توحيد الصيغة
-        return inc.autoFromPay && inc.studentId === id && inc.year === cy && incMonth === cm;
+        const incMonth = inc.month ? parseInt(inc.month).toString() : '';
+        const cmPadded = cm.padStart(2, '0');
+        const monthMatch = incMonth === cm || inc.month === cm || inc.month === cmPadded;
+        return inc.autoFromPay && inc.studentId === id && inc.year === cy && monthMatch;
       });
       
       console.log(`🔍 Found ${incomesToRemove.length} income(s) to remove`);
@@ -4211,7 +4232,19 @@ function renderStudentsTable() {
     
     const rank = !isExamsOnlyStudent ? ranks[s.grade]?.findIndex(r => r.id === s.id) : -1;
     const isLeft = (s.status||'active') === 'left';
-    const rankTxt = rank !== undefined && rank >= 0 && rank < 3 ? ['🥇','🥈','🥉'][rank] : '-';
+    
+    // الحصول على المركز الفعلي
+    let rankTxt = '-';
+    if (!isExamsOnlyStudent && rank >= 0) {
+      const studentRankObj = ranks[s.grade]?.find(r => r.id === s.id);
+      const actualRank = studentRankObj ? studentRankObj.rank : (rank + 1);
+      
+      if (actualRank === 1) rankTxt = '🥇';
+      else if (actualRank === 2) rankTxt = '🥈';
+      else if (actualRank === 3) rankTxt = '🥉';
+      else rankTxt = `#${actualRank}`;
+    }
+    
     const payCell = isPrivateType(s.type)
       ? (s.feeExempt
         ? `<span class="badge badge-info"><i class="fas fa-gift"></i> معفي</span>`
@@ -4375,10 +4408,32 @@ function typeLabel(type) {
 // نص الترتيب — تشجيعي وبإيموجي واضح
 function getRankText(rankIdx, grade, forWA, s) {
   const lbl = studentLabel(s);  // دايماً يرجع object حتى لو s فاضي
-  if (rankIdx === 0) return `🥇 ${lbl.rank1} في ${grade}`;
-  if (rankIdx === 1) return `🥈 ${lbl.rank2} في ${grade}`;
-  if (rankIdx === 2) return `🥉 ${lbl.rank3} في ${grade}`;
-  // خارج الـ 3 الأوائل أو غير محدد
+  
+  // لو المركز -1 يعني الطالب مش موجود في القائمة
+  if (rankIdx < 0) {
+    const encouragements = [
+      '💪 بيتحسن باستمرار — الترتيب الأعلى قريب!',
+      '🌟 كل شهر أحسن من اللي قبله — واصل!',
+      '🚀 مع المذاكرة المنتظمة هيتصدر القائمة!',
+      '✨ الشهر الجاي هيكون أقوى بإذن الله!',
+      '🎯 خطوة خطوة — النجاح قادم بإذن الله!',
+      '🌱 كل مجهود بيتحسب — واصل يا بطل!',
+    ];
+    const pick = encouragements[new Date().getMonth() % encouragements.length];
+    return forWA ? `لم يحصل على مركز هذا الشهر\n${pick}` : pick;
+  }
+  
+  // الحصول على المركز الفعلي من ranks
+  const ranks = computeRanks();
+  const gradeRanks = ranks[grade] || [];
+  const studentRank = gradeRanks.find(r => r.id === s?.id);
+  const actualRank = studentRank ? studentRank.rank : (rankIdx + 1);
+  
+  if (actualRank === 1) return `🥇 ${lbl.rank1} في ${grade}`;
+  if (actualRank === 2) return `🥈 ${lbl.rank2} في ${grade}`;
+  if (actualRank === 3) return `🥉 ${lbl.rank3} في ${grade}`;
+  
+  // خارج الـ 3 الأوائل
   const encouragements = [
     '💪 بيتحسن باستمرار — الترتيب الأعلى قريب!',
     '🌟 كل شهر أحسن من اللي قبله — واصل!',
@@ -4494,7 +4549,19 @@ function renderHonorRoll() {
       }
       
       const all = ranks[grade] || [];
-      const top3 = all.slice(0, 3);
+      
+      // نجيب كل الطلاب اللي مراكزهم 1 أو 2 أو 3 (مش أول 3 طلاب بس)
+      const top3 = all.filter(s => s.rank <= 3);
+      
+      // نحسب كل مركز كام مرة متكرر
+      const rankCounts = {};
+      top3.forEach(s => {
+        rankCounts[s.rank] = (rankCounts[s.rank] || 0) + 1;
+      });
+      
+      // عداد لكل مركز عشان نعرف ده أول ظهور ولا تاني
+      const rankOccurrence = { 1: 0, 2: 0, 3: 0 };
+      
       html += `<div class="honor-card">
         <div class="honor-card-header">
           <i class="fas fa-trophy" style="color:#f0c040"></i> ${grade}
@@ -4505,10 +4572,45 @@ function renderHonorRoll() {
       } else {
         top3.forEach((s, i) => {
           if (s.score === 0 && i > 0) return;
+          
+          // تحديد الميدالية والـstyle حسب المركز الفعلي
+          const rankIdx = s.rank - 1; // 0-indexed للألوان
+          const medal = medals[rankIdx] || `#${s.rank}`;
+          const color = rankColors[rankIdx] || '#6c757d';
+          
+          // زيادة عداد المركز
+          rankOccurrence[s.rank]++;
+          
+          // تحديد النص: "الأول" أو "الأول مكرر" أو "الثاني" إلخ
+          const rankNames = {
+            1: 'الأول',
+            2: 'الثاني', 
+            3: 'الثالث'
+          };
+          const baseName = rankNames[s.rank] || `المركز ${s.rank}`;
+          const isDuplicate = rankCounts[s.rank] > 1;
+          const isFirstOccurrence = rankOccurrence[s.rank] === 1;
+          
+          let rankLabel = '';
+          if (isDuplicate) {
+            // لو المركز متكرر
+            if (isFirstOccurrence) {
+              rankLabel = baseName; // أول واحد: "الأول"
+            } else {
+              rankLabel = `${baseName} مكرر`; // الباقيين: "الأول مكرر"
+            }
+          } else {
+            // لو المركز مش متكرر
+            rankLabel = baseName;
+          }
+          
           html += `<div class="rank-item">
-            <div class="rank-num rank-${i+1}" style="background:linear-gradient(135deg,${rankColors[i]}aa,${rankColors[i]});color:${i===0?'#000':'#fff'}">${medals[i]}</div>
+            <div class="rank-num rank-${s.rank}" style="background:linear-gradient(135deg,${color}aa,${color});color:${s.rank===1?'#000':'#fff'}">${medal}</div>
             <div class="rank-info">
-              <div class="rank-name">${s.name}</div>
+              <div class="rank-name">
+                ${s.name}
+                <span style="font-size:0.72rem;color:var(--text-muted);margin-right:6px;font-weight:500">(${rankLabel})</span>
+              </div>
               <div class="rank-score">
                 <span style="color:var(--accent);font-weight:700">${s.score}</span>
                 <span style="color:var(--text-muted)">/${maxTotal} درجة</span>
@@ -4548,7 +4650,19 @@ function computeRanksSync(monthKey) {
       }
       return { id: s.id, name: s.name, score: totalScore };
     });
+    
+    // ترتيب الطلاب حسب الدرجة (الأعلى أولاً)
     scored.sort((a,b) => b.score - a.score);
+    
+    // إضافة المركز الفعلي مع مراعاة التساوي
+    let currentRank = 1;
+    for (let i = 0; i < scored.length; i++) {
+      if (i > 0 && scored[i].score < scored[i - 1].score) {
+        currentRank = i + 1; // المركز الجديد = الموقع الحالي + 1
+      }
+      scored[i].rank = currentRank;
+    }
+    
     result[grade] = scored;
   });
   return result;
@@ -5353,6 +5467,7 @@ function openWA(phone, message) {
 function sendWelcomeWA(studentId) {
   const s = students[studentId];
   if (!s) return;
+  // استخدام صيغة عربية للعرض في الرسالة
   const today = new Date().toLocaleDateString('ar-EG');
   const lbl = studentLabel(s);
   const msg = `بسم الله الرحمن الرحيم 🌟\n\n🧪 *منصة الأوربيتالي في العلوم* 🧪\n👨‍🔬 *مستر: عمرو عبد الرازق*\n----------------------------------------\nالسلام عليكم ورحمة الله وبركاته،\nتحية طيبة وبعد..\n\nتم تسجيل ${lbl.student}: *${s.name}* بنجاح في منصة الأوربيتالي.\nنُبارك لحضرتك هذا التسجيل ونهنئك بـ${lbl.joined} إلى المنصة 🎉\n\n📚 *الصف الدراسي:* ${s.grade}\n📅 *تاريخ الالتحاق:* ${today}\n\n🪪 *كود ${lbl.student} الخاص:*  *${s.customCode || '—'}*\n_(احتفظ بهذا الكود — بيستخدم لمتابعة بيانات ${lbl.student} على المنصة)_\n\nسيتم إخطار حضرتك بتقارير الحضور والدرجات بشكل منتظم إن شاء الله 📊\n\n📸 *تنبيه مهم:*\nمن فضلك أرسل ${lbl.photo} على هذا الرقم لاستخراج *${lbl.carneh}* الخاص بـ *${s.name}* 🪪\n\nلو عايز تعرف أكتر ابعت للمستر 📩\n\n*أ. عمرو عبد الرازق — علوم وكيمياء* 🧪\n🪐 *منصة الأوربيتالي*`;
@@ -5445,7 +5560,20 @@ function sendMonthlyReport(studentId) {
   const ranks = computeRanks(currentMonth);
   const gradeRanks = ranks[s.grade] || [];
   const rankIdx = gradeRanks.findIndex(r => r.id === studentId);
-  const rankTxt = getRankText(rankIdx, s.grade, true, s);
+  
+  // الحصول على المركز الفعلي للرسالة
+  let rankTxt = getRankText(rankIdx, s.grade, true, s);
+  if (rankIdx >= 0) {
+    const studentRankObj = gradeRanks.find(r => r.id === studentId);
+    const actualRank = studentRankObj ? studentRankObj.rank : (rankIdx + 1);
+    const lbl = studentLabel(s);
+    
+    if (actualRank === 1) rankTxt = `🥇 ${lbl.rank1} في ${s.grade}`;
+    else if (actualRank === 2) rankTxt = `🥈 ${lbl.rank2} في ${s.grade}`;
+    else if (actualRank === 3) rankTxt = `🥉 ${lbl.rank3} في ${s.grade}`;
+    else rankTxt = `المركز ${actualRank} في ${s.grade}`;
+  }
+  
   const attendance = countAttendance(md);
   
   // الحصول على إعدادات الدرجات لهذه المرحلة
@@ -5938,10 +6066,18 @@ function checkSafePin() {
     safeLocked = false;
     document.getElementById('safeLockScreen').style.display = 'none';
     document.getElementById('safeContent').style.display = 'block';
-    renderIncomes();
-    renderBooks();
-    loadAssistantAccountUI();
-    loadObserverAccountUI();
+    console.log(`🔓 Safe unlocked`);
+    console.log(`📊 centerIncomes has ${Object.keys(centerIncomes).length} items`);
+    console.log(`💰 expenses has ${Object.keys(expenses).length} items`);
+    
+    // رندر كل حاجة
+    setTimeout(() => {
+      renderIncomes();
+      renderBooks();
+      loadAssistantAccountUI();
+      loadObserverAccountUI();
+    }, 100);
+    
     toast('تم فتح الخزنة','success');
   } else {
     document.getElementById('pinErr').style.display = 'block';
@@ -5978,17 +6114,43 @@ function saveIncome() {
   const month = parseInt(monthStr).toString(); // إزالة الـ leading zero: "08" → "8"
   
   const id = db.ref('centerIncomes').push().key;
-  const date = new Date().toLocaleDateString('ar-EG');
+  // استخدام صيغة ISO للتاريخ (YYYY-MM-DD) بدلاً من ar-EG
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   
-  console.log(`💰 Adding manual income:`, { desc, amount, month, year, date });
+  const incomeData = { 
+    id, 
+    desc, 
+    amount, 
+    month, 
+    year, 
+    date 
+  };
   
-  db.ref(`centerIncomes/${id}`).set({ id, desc, amount, month, year, date })
+  console.log(`💰 Adding manual income:`, incomeData);
+  console.log(`📅 Current month in app:`, currentMonth);
+  
+  db.ref(`centerIncomes/${id}`).set(incomeData)
     .then(() => { 
       toast('✅ تم إضافة الإيراد','success'); 
       closeModal('incomeModal'); 
       console.log(`✅ Income added successfully`);
+      console.log(`🔄 centerIncomes now has ${Object.keys(centerIncomes).length} items`);
+      
+      // تحديث الواجهة فوراً
+      setTimeout(() => {
+        console.log(`🎨 Force rendering incomes...`);
+        renderIncomes();
+        // تحديث المطابقة تلقائياً
+        if (document.getElementById('reconcileDate')?.value === date) {
+          calcReconcile();
+        }
+      }, 500);
     })
-    .catch(() => toast('خطأ','error'));
+    .catch(err => {
+      console.error('❌ Error saving income:', err);
+      toast('خطأ','error');
+    });
 }
 
 function deleteIncome(id) {
@@ -6002,8 +6164,10 @@ function deleteIncome(id) {
     
     // التحقق من الشهر - لازم نتأكد إن الإيراد من نفس الشهر الحالي (مع توحيد الصيغة)
     const [cy, cm] = currentMonth.split('_');
-    const incMonth = parseInt(inc.month).toString();
-    const isCurrentMonth = inc.year === cy && incMonth === cm;
+    const incMonth = inc.month ? parseInt(inc.month).toString() : '';
+    const cmPadded = cm.padStart(2, '0');
+    const monthMatch = incMonth === cm || inc.month === cm || inc.month === cmPadded;
+    const isCurrentMonth = inc.year === cy && monthMatch;
     
     if (!isCurrentMonth) {
       // إيراد من شهر قديم - نحذفه بس بدون إلغاء الدفع
@@ -6112,34 +6276,140 @@ function toggleIncomeList() {
 }
 
 function renderIncomes() {
-  const rdEl = document.getElementById('reconcileDate');
-  if (rdEl && !rdEl.value) rdEl.value = new Date().toISOString().split('T')[0];
-  const rdLabel = document.getElementById('reconcile-date');
-  if (rdLabel) rdLabel.textContent = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  try {
+    const rdEl = document.getElementById('reconcileDate');
+    if (rdEl && !rdEl.value) rdEl.value = new Date().toISOString().split('T')[0];
+    const rdLabel = document.getElementById('reconcile-date');
+    if (rdLabel) rdLabel.textContent = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-  const tbody   = document.getElementById('incomeBody');
-  const statsEl = document.getElementById('safeStats');
-  const countEl = document.getElementById('income-count');
-  if (!tbody || !statsEl) return;
-  renderUnpaidList();
+    const tbody   = document.getElementById('incomeBody');
+    const statsEl = document.getElementById('safeStats');
+    const countEl = document.getElementById('income-count');
+    if (!tbody || !statsEl) {
+      console.error('❌ Missing required elements:', { tbody: !!tbody, statsEl: !!statsEl });
+      return;
+    }
+    renderUnpaidList();
 
   const list = Object.values(centerIncomes);
   const [cy, cm] = currentMonth.split('_');
+  
+  console.log(`🔍 renderIncomes Debug:`, {
+    currentMonth,
+    cy, 
+    cm,
+    totalIncomes: list.length,
+    allIncomes: list.map(i => ({ 
+      desc: i.desc, 
+      month: i.month, 
+      year: i.year, 
+      amount: i.amount,
+      autoFromPay: i.autoFromPay 
+    }))
+  });
 
   // الإيرادات اليدوية فقط (بدون التلقائية)
-  // ملاحظة: نتعامل مع month بصيغتين: "9" و "09"
-  const curManual   = list.filter(inc => {
-    const incMonth = parseInt(inc.month).toString(); // توحيد الصيغة
-    return inc.year === cy && incMonth === cm && !inc.autoFromPay;
+  const curManual = list.filter(inc => {
+    if (!inc.year || !inc.month) return false;
+    
+    // توحيد الصيغة للمقارنة
+    const incYear = String(inc.year);
+    const incMonth = String(inc.month);
+    const curYear = String(cy);
+    const curMonth = String(parseInt(cm)); // إزالة أي leading zero
+    
+    const yearMatch = incYear === curYear;
+    const monthMatch = incMonth === curMonth || incMonth === cm;
+    const isManual = !inc.autoFromPay;
+    
+    return yearMatch && monthMatch && isManual;
   });
-  const curAuto     = list.filter(inc => {
-    const incMonth = parseInt(inc.month).toString();
-    return inc.year === cy && incMonth === cm && inc.autoFromPay;
+  
+  const curAuto = list.filter(inc => {
+    if (!inc.year || !inc.month) return false;
+    
+    const incYear = String(inc.year);
+    const incMonth = String(inc.month);
+    const curYear = String(cy);
+    const curMonth = String(parseInt(cm));
+    
+    const yearMatch = incYear === curYear;
+    const monthMatch = incMonth === curMonth || incMonth === cm;
+    const isAuto = inc.autoFromPay === true;
+    
+    return yearMatch && monthMatch && isAuto;
   });
+  
+  console.log(`📊 Filtered Incomes:`, {
+    manualCount: curManual.length,
+    autoCount: curAuto.length,
+    manual: curManual.map(i => ({ desc: i.desc, month: i.month, year: i.year, amount: i.amount })),
+    auto: curAuto.map(i => ({ desc: i.desc, month: i.month, year: i.year, amount: i.amount }))
+  });
+  
   const manualTotal = curManual.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
   const autoTotal   = curAuto.reduce((s,i)   => s + (parseFloat(i.amount)||0), 0);
   const monthTotal  = manualTotal + autoTotal;           // إجمالي الشهر (يدوي + تلقائي)
-  const allTotal    = list.reduce((s,i)       => s + (parseFloat(i.amount)||0), 0);
+  
+  // 💰 الرصيد التراكمي (كل الإيرادات - كل المصروفات من البداية)
+  const allIncomes = list.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
+  const allExpenses = Object.values(expenses || {}).reduce((s,e) => s + (parseFloat(e.amount)||0), 0);
+  const cumulativeBalance = allIncomes - allExpenses;
+  
+  // 🔄 حساب الرصيد من الشهور السابقة (قبل الشهر الحالي)
+  const previousIncomes = list.filter(inc => {
+    if (!inc.year || !inc.month) return false;
+    
+    const incYear = String(inc.year);
+    const incMonth = String(inc.month);
+    const curYear = String(cy);
+    const curMonth = String(parseInt(cm));
+    
+    const yearMatch = incYear === curYear;
+    const monthMatch = incMonth === curMonth || incMonth === cm;
+    
+    // كل الإيرادات إلا الشهر الحالي
+    return !(yearMatch && monthMatch);
+  }).reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
+  
+  // المصروفات - تحديد الشهر أولاً
+  const [ey, em] = currentMonth.split('_');
+  
+  // حساب مصروفات الشهر الحالي
+  const expList = Object.values(expenses || {}).filter(e => {
+    if (!e.year || !e.month) return false;
+    
+    const expYear = String(e.year);
+    const expMonth = String(e.month);
+    const curYear = String(ey);
+    const curMonth = String(parseInt(em));
+    
+    const yearMatch = expYear === curYear;
+    const monthMatch = expMonth === curMonth || expMonth === em;
+    
+    return yearMatch && monthMatch;
+  });
+  const expTotal = expList.reduce((s,e) => s + (parseFloat(e.amount)||0), 0);
+  
+  // حساب مصروفات الشهور السابقة
+  const previousExpenses = Object.values(expenses || {}).filter(e => {
+    if (!e.year || !e.month) return false;
+    
+    const expYear = String(e.year);
+    const expMonth = String(e.month);
+    const curYear = String(ey);
+    const curMonth = String(parseInt(em));
+    
+    const yearMatch = expYear === curYear;
+    const monthMatch = expMonth === curMonth || expMonth === em;
+    
+    return !(yearMatch && monthMatch);
+  }).reduce((s,e) => s + (parseFloat(e.amount)||0), 0);
+  
+  const previousBalance = previousIncomes - previousExpenses;
+  const currentMonthNet = monthTotal - expTotal;
+  const balanceUpToNow = previousBalance + currentMonthNet;
+  const netMonth = monthTotal - expTotal;  // الصافي = كل الإيرادات - المصروفات
 
   console.log(`📊 Incomes for ${currentMonth}:`, {
     manualCount: curManual.length,
@@ -6147,17 +6417,13 @@ function renderIncomes() {
     manualTotal,
     autoTotal,
     monthTotal,
-    sampleIncomes: list.slice(0, 3).map(i => ({ desc: i.desc, year: i.year, month: i.month }))
+    currentMonthValue: cm,
+    cumulativeBalance,
+    previousBalance,
+    currentMonthNet,
+    balanceUpToNow,
+    sampleIncomes: list.slice(0, 5).map(i => ({ desc: i.desc, year: i.year, month: i.month }))
   });
-
-  // المصروفات
-  const [ey, em] = currentMonth.split('_');
-  const expList  = Object.values(expenses || {}).filter(e => {
-    const expMonth = parseInt(e.month).toString(); // توحيد الصيغة
-    return e.year === ey && expMonth === em;
-  });
-  const expTotal = expList.reduce((s,e) => s + (parseFloat(e.amount)||0), 0);
-  const netMonth = monthTotal - expTotal;  // الصافي = كل الإيرادات - المصروفات
 
   console.log(`💰 Net Profit for ${currentMonth}:`, {
     totalIncome: monthTotal,
@@ -6172,45 +6438,61 @@ function renderIncomes() {
   const remaining = expectedRevenue - autoTotal; // المتبقي لم يدفع بعد
 
   statsEl.innerHTML = `
+    <div class="stat-card" style="border-color:rgba(255,193,7,0.6);box-shadow:0 0 20px rgba(255,193,7,0.3);background:linear-gradient(135deg, rgba(255,193,7,0.15) 0%, rgba(255,152,0,0.15) 100%)">
+      <div class="stat-icon" style="font-size:2.2rem">🏦</div>
+      <div class="stat-val" style="font-size:2rem;font-weight:900;color:#f57c00">${balanceUpToNow.toLocaleString('ar-EG')} ج</div>
+      <div class="stat-label" style="font-weight:700;font-size:1rem">رصيد الخزنة التراكمي (من البداية)</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,0.1)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span>💼 رصيد الشهور السابقة:</span>
+          <span style="font-weight:600">${previousBalance.toLocaleString('ar-EG')} ج</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span>${currentMonthNet >= 0 ? '➕' : '➖'} صافي ${formatMonthLabel(currentMonth)}:</span>
+          <span style="font-weight:600;color:${currentMonthNet >= 0 ? 'var(--success)' : 'var(--danger)'}">${currentMonthNet.toLocaleString('ar-EG')} ج</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card stat-success" style="border-color:rgba(63,185,80,0.5);box-shadow:0 0 12px rgba(63,185,80,0.12)">
+      <div class="stat-icon" style="font-size:2rem">💰</div>
+      <div class="stat-val" style="font-size:1.8rem;font-weight:800">${monthTotal.toLocaleString('ar-EG')} ج</div>
+      <div class="stat-label" style="font-weight:700">إجمالي إيرادات ${formatMonthLabel(currentMonth)}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">
+        ⚡ ${autoTotal.toLocaleString('ar-EG')} ج (طلاب) + 📋 ${manualTotal.toLocaleString('ar-EG')} ج (يدوي)
+      </div>
+    </div>
+    <div class="stat-card stat-danger">
+      <div class="stat-icon">🛒</div>
+      <div class="stat-val">${expTotal.toLocaleString('ar-EG')} ج</div>
+      <div class="stat-label">مصروفات ${formatMonthLabel(currentMonth)}</div>
+    </div>
+    <div class="stat-card ${netMonth>=0?'stat-success':'stat-danger'}" style="border-width:2px;${netMonth>=0?'border-color:rgba(63,185,80,0.6);box-shadow:0 0 15px rgba(63,185,80,0.2)':'border-color:rgba(248,81,73,0.6);box-shadow:0 0 15px rgba(248,81,73,0.2)'}">
+      <div class="stat-icon" style="font-size:2rem">${netMonth>=0?'📈':'📉'}</div>
+      <div class="stat-val" style="font-size:1.8rem;font-weight:900">${netMonth.toLocaleString('ar-EG')} ج</div>
+      <div class="stat-label" style="font-weight:700">صافي ربح ${formatMonthLabel(currentMonth)}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">
+        الإيرادات - المصروفات
+      </div>
+    </div>
     <div class="stat-card" style="border-color:rgba(79,142,247,0.5);box-shadow:0 0 12px rgba(79,142,247,0.12)">
       <div class="stat-icon">🎯</div>
-      <div class="stat-val">${expectedRevenue.toLocaleString('ar-EG')}</div>
-      <div class="stat-label">الدخل المتوقع (كل الطلاب)</div>
-    </div>
-    <div class="stat-card stat-success">
-      <div class="stat-icon">💵</div>
-      <div class="stat-val">${monthTotal.toLocaleString('ar-EG')}</div>
-      <div class="stat-label">إيرادات ${formatMonthLabel(currentMonth)}</div>
+      <div class="stat-val">${expectedRevenue.toLocaleString('ar-EG')} ج</div>
+      <div class="stat-label">الدخل المتوقع (كل الطلاب النشطين)</div>
     </div>
     <div class="stat-card stat-info">
       <div class="stat-icon">⚡</div>
-      <div class="stat-val">${autoTotal.toLocaleString('ar-EG')}</div>
-      <div class="stat-label">مصاريف طلاب (دفعوا)</div>
+      <div class="stat-val">${autoTotal.toLocaleString('ar-EG')} ج</div>
+      <div class="stat-label">مصاريف طلاب دفعوا</div>
     </div>
     ${remaining > 0 ? `<div class="stat-card stat-warning">
       <div class="stat-icon">⏳</div>
-      <div class="stat-val">${remaining.toLocaleString('ar-EG')}</div>
+      <div class="stat-val">${remaining.toLocaleString('ar-EG')} ج</div>
       <div class="stat-label">متبقي لم يدفع بعد</div>
     </div>` : ''}
     <div class="stat-card stat-accent">
       <div class="stat-icon">📋</div>
-      <div class="stat-val">${manualTotal.toLocaleString('ar-EG')}</div>
-      <div class="stat-label">إيرادات يدوية</div>
-    </div>
-    <div class="stat-card stat-danger">
-      <div class="stat-icon">🛒</div>
-      <div class="stat-val">${expTotal.toLocaleString('ar-EG')}</div>
-      <div class="stat-label">المصروفات</div>
-    </div>
-    <div class="stat-card ${netMonth>=0?'stat-success':'stat-danger'}">
-      <div class="stat-icon">${netMonth>=0?'📈':'📉'}</div>
-      <div class="stat-val">${netMonth.toLocaleString('ar-EG')}</div>
-      <div class="stat-label">الصافي (الشهر) = كل الإيرادات - المصروفات</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">📊</div>
-      <div class="stat-val">${allTotal.toLocaleString('ar-EG')}</div>
-      <div class="stat-label">إجمالي كل الإيرادات (كل الشهور)</div>
+      <div class="stat-val">${manualTotal.toLocaleString('ar-EG')} ج</div>
+      <div class="stat-label">إيرادات يدوية فقط</div>
     </div>`;
 
   if (!list.length) {
@@ -6219,12 +6501,27 @@ function renderIncomes() {
     return;
   }
   
-  // عرض فقط إيرادات الشهر الحالي (مع توحيد صيغة month)
+  // عرض فقط إيرادات الشهر الحالي
   const currentMonthIncomes = list.filter(inc => {
-    const incMonth = parseInt(inc.month).toString();
-    return inc.year === cy && incMonth === cm;
+    if (!inc.year || !inc.month) return false;
+    
+    const incYear = String(inc.year);
+    const incMonth = String(inc.month);
+    const curYear = String(cy);
+    const curMonth = String(parseInt(cm));
+    
+    const yearMatch = incYear === curYear;
+    const monthMatch = incMonth === curMonth || incMonth === cm;
+    
+    return yearMatch && monthMatch;
   });
+  
   if (countEl) countEl.textContent = currentMonthIncomes.length;
+  
+  console.log(`📋 Current month incomes:`, {
+    total: currentMonthIncomes.length,
+    items: currentMonthIncomes.map(i => ({ desc: i.desc, amount: i.amount, date: i.date }))
+  });
   
   if (!currentMonthIncomes.length) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">لا توجد إيرادات في ${formatMonthLabel(currentMonth)}</td></tr>`;
@@ -6232,8 +6529,20 @@ function renderIncomes() {
   }
   
   currentMonthIncomes.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-  tbody.innerHTML = currentMonthIncomes.map((inc, i) =>
-    `<tr style="${inc.autoFromPay ? 'background:rgba(63,185,80,0.04)' : ''}">
+  tbody.innerHTML = currentMonthIncomes.map((inc, i) => {
+    // تحويل التاريخ للعرض
+    let displayDate = inc.date || '';
+    if (displayDate && displayDate.includes('-')) {
+      // صيغة ISO (YYYY-MM-DD)
+      try {
+        const d = new Date(displayDate + 'T00:00:00');
+        displayDate = d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric', year: 'numeric' });
+      } catch (e) {
+        // إذا فشل التحويل، استخدم التاريخ كما هو
+      }
+    }
+    
+    return `<tr style="${inc.autoFromPay ? 'background:rgba(63,185,80,0.04)' : ''}">
       <td>${i+1}</td>
       <td>
         ${inc.autoFromPay ? '<span class="badge badge-success" style="font-size:0.7rem;margin-left:4px"><i class="fas fa-bolt"></i> تلقائي</span>' : ''}
@@ -6241,10 +6550,10 @@ function renderIncomes() {
       </td>
       <td style="color:var(--success);font-weight:700">${parseFloat(inc.amount||0).toLocaleString('ar-EG')} ج</td>
       <td>${MONTHS_AR[(parseInt(inc.month)||1)-1]||inc.month} ${inc.year||''}</td>
-      <td>${inc.date||''}</td>
+      <td>${displayDate}</td>
       <td><button class="btn btn-xs btn-danger" onclick="deleteIncome('${inc.id}')" title="${inc.autoFromPay?'حذف الإيراد وإلغاء الدفع':'حذف'}"><i class="fas fa-trash"></i></button></td>
-    </tr>`
-  ).join('');
+    </tr>`;
+  }).join('');
 
   // عرض المصروفات للشهر الحالي فقط
   const expBody = document.getElementById('expenseBody');
@@ -6253,10 +6562,19 @@ function renderIncomes() {
     const [ey, em] = currentMonth.split('_');
     const expAll = Object.values(expenses || {});
     
-    // فلترة المصروفات للشهر الحالي فقط (مع توحيد صيغة month)
+    // فلترة المصروفات للشهر الحالي فقط
     const currentMonthExpenses = expAll.filter(e => {
-      const expMonth = parseInt(e.month).toString();
-      return e.year === ey && expMonth === em;
+      if (!e.year || !e.month) return false;
+      
+      const expYear = String(e.year);
+      const expMonth = String(e.month);
+      const curYear = String(ey);
+      const curMonth = String(parseInt(em));
+      
+      const yearMatch = expYear === curYear;
+      const monthMatch = expMonth === curMonth || expMonth === em;
+      
+      return yearMatch && monthMatch;
     });
     
     // تحديث عداد المصروفات
@@ -6266,14 +6584,39 @@ function renderIncomes() {
       expBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">لا توجد مصروفات في ${formatMonthLabel(currentMonth)}</td></tr>`;
     } else {
       currentMonthExpenses.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-      expBody.innerHTML = currentMonthExpenses.map((e,i) => `<tr>
+      expBody.innerHTML = currentMonthExpenses.map((e,i) => {
+        // تحويل التاريخ للعرض
+        let displayDate = e.date || '';
+        if (displayDate && displayDate.includes('-')) {
+          // صيغة ISO (YYYY-MM-DD)
+          try {
+            const d = new Date(displayDate + 'T00:00:00');
+            displayDate = d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric', year: 'numeric' });
+          } catch (err) {
+            // إذا فشل التحويل، استخدم التاريخ كما هو
+          }
+        }
+        
+        return `<tr>
         <td>${i+1}</td>
         <td>${e.desc}</td>
         <td style="color:var(--danger);font-weight:700">${parseFloat(e.amount||0).toLocaleString('ar-EG')} ج</td>
         <td>${MONTHS_AR[(parseInt(e.month)||1)-1]||e.month} ${e.year||''}</td>
-        <td>${e.date||''}</td>
+        <td>${displayDate}</td>
         <td><button class="btn btn-xs btn-danger" onclick="deleteExpense('${e.id}')"><i class="fas fa-trash"></i></button></td>
-      </tr>`).join('');
+      </tr>`;
+      }).join('');
+    }
+  }
+  } catch (error) {
+    console.error('❌ Error in renderIncomes:', error);
+    const statsEl = document.getElementById('safeStats');
+    if (statsEl) {
+      statsEl.innerHTML = `<div class="stat-card" style="background:var(--danger-bg);border-color:var(--danger)">
+        <div class="stat-icon">❌</div>
+        <div class="stat-label">حدث خطأ في تحميل البيانات</div>
+        <div style="font-size:0.8rem;margin-top:8px">${error.message}</div>
+      </div>`;
     }
   }
 }
@@ -6301,7 +6644,8 @@ function calcReconcile() {
   const resultEl = document.getElementById('reconcileResult');
   if (!resultEl) return;
 
-  const targetDate = new Date(dateVal).toLocaleDateString('ar-EG');
+  // استخدام صيغة ISO مباشرة (YYYY-MM-DD)
+  const targetDate = dateVal;
 
   // كل الإيرادات المسجلة لهذا اليوم
   const allIncomes = Object.values(centerIncomes).filter(inc => inc.date === targetDate);
@@ -6331,6 +6675,13 @@ function calcReconcile() {
   const manualItems = validIncomes.filter(i => !i.autoFromPay);
   const diff    = actual - systemTotal;
   const isMatch = Math.abs(diff) < 0.01;
+  
+  // تحويل التاريخ للعرض بالعربي
+  const displayDate = new Date(targetDate + 'T00:00:00').toLocaleDateString('ar-EG', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 
   let details = '';
   if (autoItems.length) {
@@ -6354,6 +6705,9 @@ function calcReconcile() {
 
   resultEl.style.display = 'block';
   resultEl.innerHTML = `
+    <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;text-align:center;font-weight:600">
+      📅 ${displayDate}
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:var(--bg-card2);border-radius:var(--radius-sm);padding:12px;text-align:center">
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">الموجود في إيدك</div>
@@ -6493,7 +6847,19 @@ function buildParentStudentCard(id) {
     const ranks = computeRanks(currentMonth);
     const gradeRanks = ranks[s.grade] || [];
     rankIdx = gradeRanks.findIndex(r => r.id === id);
-    rankTxt = getRankText(rankIdx, s.grade, false, s);
+    
+    // الحصول على المركز الفعلي
+    if (rankIdx >= 0) {
+      const studentRankObj = gradeRanks.find(r => r.id === id);
+      const actualRank = studentRankObj ? studentRankObj.rank : (rankIdx + 1);
+      
+      if (actualRank === 1) rankTxt = `🥇 الأول في ${s.grade}`;
+      else if (actualRank === 2) rankTxt = `🥈 الثاني في ${s.grade}`;
+      else if (actualRank === 3) rankTxt = `🥉 الثالث في ${s.grade}`;
+      else rankTxt = `المركز #${actualRank} في ${s.grade}`;
+    } else {
+      rankTxt = getRankText(rankIdx, s.grade, false, s);
+    }
   }
 
   // درجات — grid واضح بدل badges متلاصقة + عرض الدرجة القصوى الصحيحة
